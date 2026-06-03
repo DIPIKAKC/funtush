@@ -11,12 +11,6 @@ A reusable authentication utility module for Node.js + TypeScript applications, 
 - Password comparison utility
 - Type-safe with TypeScript
 
-## Tech Stack
-
-- Node.js
-- TypeScript
-- bcrypt
-- jsonwebtoken
 
 ## Installation
 
