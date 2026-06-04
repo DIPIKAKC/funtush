@@ -4,16 +4,8 @@ import { generateSlug } from "../utils/slug";
 import { sendWelcomeEmail } from "../utils/email";
 
 
-interface CreateAgencyData {
-  company_name: string;
-  email: string;
-  password: string;
-  phone: string;
-  country?: string;
-}
-
-export const createAgency = async (data: CreateAgencyData) => {
-  const { company_name, email, password, phone } = data;
+export const createAgency = async (data: any) => {
+  const { company_name, email, password, phone, country } = data;
 
   // validation
   validateAcencyInput({ email, password, phone });
@@ -25,13 +17,13 @@ export const createAgency = async (data: CreateAgencyData) => {
   );
 
   if (existing.rows.length > 0) {
-    const error = new Error("Email already exists") as Error & { status?: number };
+    const error: any = new Error("Email already exists");
     error.status = 409;
     throw error;
   }
 
   // generate unique slug
-  const slug = await generateSlug(company_name, db);
+  let slug = await generateSlug(company_name, db);
 
   // create agency
   const agencyResult = await db.query(
