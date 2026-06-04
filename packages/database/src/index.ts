@@ -1,4 +1,5 @@
 import { tenantKey, type TenantContext } from "@funtush/shared";
+export * from "./redis.js";
 
 /**
  * Connection configuration for the three primary stores (Backend Guide §3):
