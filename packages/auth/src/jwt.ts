@@ -79,3 +79,16 @@ export const verifyAccessToken = (
     throw new Error("Authentication failed");
   }
 };
+
+// verify refresh token and return the payload
+export const verifyRefreshToken = (
+  token: string,
+  secret?: string
+): { userId: string } => {
+  const decoded = jwt.verify(
+    token,
+    resolveSecret(secret, "JWT_REFRESH_SECRET")
+  ) as any;
+
+  return { userId: decoded.userId };
+};

@@ -2,9 +2,13 @@ import { verifyAccessToken } from "./jwt";
 import { jwtPayload } from "./types";
 import type { Request, Response, NextFunction } from "express";
 
+export type AuthRequest = Request & {
+  user?: jwtPayload;
+};
+
 // auth middleware - verify bearer token
 export const requireAuth = (
-  req: Request & { user?: jwtPayload },
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
@@ -18,11 +22,11 @@ export const requireAuth = (
     const token = header.split(" ")[1];
     const decoded = verifyAccessToken(token);
 
-    req.user = decoded;
+    // ensure decoded token matches the AuthRequest user type
+    req.user = decoded as AuthRequest["user"];
 
     next();
   } catch (err) {
-    console.error("Auth error:", err);
     return res.status(401).json({
       message: "Unauthorized",
     });
@@ -32,7 +36,7 @@ export const requireAuth = (
 // Role based access control
 export const requireRole = (roles: string[]) => {
   return (
-    req: Request & { user?: jwtPayload },
+    req: AuthRequest,
     res: Response,
     next: NextFunction
   ) => {
@@ -56,7 +60,7 @@ export const requireRole = (roles: string[]) => {
 // permission based access control
 export const requirePermission = (permission: string) => {
   return (
-    req: Request & { user?: jwtPayload },
+    req: AuthRequest,
     res: Response,
     next: NextFunction
   ) => {
@@ -82,7 +86,7 @@ export const requirePermission = (permission: string) => {
 
 export const requireRoleType = (allowedTypes: jwtPayload["roleType"][]) => {
   return (
-    req: Request & { user?: jwtPayload },
+    req: AuthRequest,
     res: Response,
     next: NextFunction
   ) => {

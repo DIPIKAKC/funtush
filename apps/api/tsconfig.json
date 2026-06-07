@@ -10,6 +10,6 @@
       "@funtush/database": ["../../packages/database/src"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "../../packages/auth/src/utils/lockout.ts", "../../packages/auth/src/utils/redis.ts", "../../packages/auth/src/utils/otpRateLimit.ts"],
   "exclude": ["node_modules"],
 }

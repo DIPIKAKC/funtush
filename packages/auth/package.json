@@ -9,6 +9,7 @@
     "@funtush/shared": "workspace:*",
     "bcrypt": "^6.0.0",
     "express": "^4.22.2",
+    "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3"
   },
   "scripts": {
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "@types/node": "^25.9.1"
+    "@types/node": "^25.9.1",
+    "@types/ioredis": "^5.0.0"
   }
 }

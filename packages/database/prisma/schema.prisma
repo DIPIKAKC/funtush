@@ -127,13 +127,15 @@ model Agency {
 model AgencyUser {
   id           String   @id @default(uuid())
   tenantId     String?  @map("tenant_id")
-  agencyId     String?  @map("agency_id")
+
+  agencyId     String   @map("agency_id")
+
   email        String   @unique
   passwordHash String   @map("password_hash")
   role         UserRole @default(STAFF)
   createdAt    DateTime @default(now()) @map("created_at")
 
-  agency       Agency?  @relation(fields: [agencyId], references: [id])
+  agency Agency @relation(fields: [agencyId], references: [id])
 
   @@map("agency_users")
 }
@@ -165,15 +167,17 @@ model Trekker {
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
+  id         String   @id @default(uuid())
 
-  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tokenHash String   @map("token_hash") @unique
-  expiresAt DateTime  @map("expires_at")
-  createdAt DateTime  @default(now()) @map("created_at")
+  tokenHash  String   @unique @map("token_hash")
+  expiresAt  DateTime @map("expires_at")
 
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
   @@map("refresh_tokens")
 }
 

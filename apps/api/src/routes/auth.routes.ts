@@ -1,5 +1,5 @@
 import express from "express";
-import { adminLogin, agencyLogin, registerTrekker, trekkerLogin, verifyOtp } from "@funtush/auth";
+import { adminLogin, agencyLogin, getMe, logoutService, refreshTokenService, registerTrekker, requireAuth, resendOtpService, trekkerLogin, verifyOtp } from "@funtush/auth";
 
 import { validate } from "../middlewares/validate";
 import { loginSchema } from "../validations/auth.validation";
@@ -75,4 +75,62 @@ router.post("/verify-otp", async (req, res) => {
   }
 });
 
+// get /auth/me - get current user info
+router.get("/me", requireAuth, (req, res) => {
+  return res.json({
+    success: true,
+    user: getMe(req.user),
+  });
+});
+
 export default router;
+
+// refresh token 
+router.post("/refresh", async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    const result = await refreshTokenService(refreshToken);
+
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(401).json({
+      message: "Invalid refresh token",
+    });
+  }
+});
+
+// logout
+router.post("/logout", async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    await logoutService(refreshToken);
+
+    res.json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({
+      message: "Logout failed",
+    });
+  }
+});
+
+// resend OTP
+router.post("/trekker/resend-otp", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const result = await resendOtpService(email);
+
+    res.json(result);
+  } catch (error: any) {
+    res.status(429).json({
+      message: error.message,
+    });
+  }
+});

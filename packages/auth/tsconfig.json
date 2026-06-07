@@ -8,5 +8,5 @@
     "moduleResolution": "NodeNext",
     "noEmit": true
   },
-  "include": ["src", "../database/src"]
+  "include": ["src", "../database/src", "../../apps/api/src/types/express.d.ts"]
 }
