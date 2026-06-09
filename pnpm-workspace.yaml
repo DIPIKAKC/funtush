@@ -6,7 +6,13 @@ packages:
   - "packages/*"
   - "config"
 allowBuilds:
+<<<<<<< HEAD
   '@prisma/engines': true
   bcrypt: true
   esbuild: true
   prisma: true
+=======
+  '@prisma/engines': false
+  esbuild: true
+  prisma: false
+>>>>>>> dfc14b2 (feat: implement resolveTenant middleware with Redis caching)

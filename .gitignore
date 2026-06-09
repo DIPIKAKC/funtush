@@ -18,6 +18,8 @@ dist/
 build/
 out/
 coverage/
+apps/api/node_modules/
+apps/api/dist/
 
 # Build tooling
 .turbo/
@@ -50,4 +52,9 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
+<<<<<<< HEAD
 .pnpm-store/
+=======
+
+
+>>>>>>> dfc14b2 (feat: implement resolveTenant middleware with Redis caching)

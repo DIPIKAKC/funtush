@@ -1,13 +1,19 @@
+<<<<<<< HEAD:apps/api/src/index.ts
 import express, { type Request, type Response } from "express";
 
 import agencyRoutes from './routes/agency.routes';
 import { startSubscriptionCron } from "./jobs/subscriptionExpiry.job";
+=======
+import express from "express";
+import { resolveTenant } from "./middleware/resolveTenant.middleware.js";
+>>>>>>> dfc14b2 (feat: implement resolveTenant middleware with Redis caching):apps/api/src/index.js
 
 const app = express();
-const port = Number(process.env.PORT ?? 4000);
 
 app.use(express.json());
+app.use(resolveTenant);
 
+<<<<<<< HEAD:apps/api/src/index.ts
 //For cron job
 startSubscriptionCron();
 
@@ -25,3 +31,17 @@ app.listen(port, () => {
 
 
 export { app };
+=======
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    tenantId: req.tenantId,
+    agencyId: req.agencyId,
+    context: req.context,   // ← "platform" | "agency" | "admin"
+  });
+});
+
+app.listen(process.env.PORT || 3000, () => {
+  console.log(`Server running on port ${process.env.PORT || 3000}`);
+});
+>>>>>>> dfc14b2 (feat: implement resolveTenant middleware with Redis caching):apps/api/src/index.js

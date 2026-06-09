@@ -17,6 +17,7 @@
     "@funtush/database": "workspace:*",
     "@funtush/shared": "workspace:*",
     "@prisma/client": "^7.8.0",
+<<<<<<< HEAD
     "express": "^4.22.2"
   },
   "devDependencies": {
@@ -25,5 +26,16 @@
     "@types/node": "^25.9.1",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^8.0.0"
+=======
+    "express": "^4.22.2",
+    "ioredis": "^5.11.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "prisma": "^7.8.0",
+    "typescript": "^6.0.3"
+>>>>>>> dfc14b2 (feat: implement resolveTenant middleware with Redis caching)
   }
+  
 }
+

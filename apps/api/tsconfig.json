@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+<<<<<<< HEAD
     "target": "ESNext",
     "module": "commonjs",
     "moduleResolution": "Node",
@@ -12,3 +13,19 @@
   "include": ["src"],
   "exclude": ["node_modules"],
 }
+=======
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "target": "ES2020",
+    "module": "commonjs",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "typeRoots": ["./src/types", "./node_modules/@types"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+>>>>>>> dfc14b2 (feat: implement resolveTenant middleware with Redis caching)
