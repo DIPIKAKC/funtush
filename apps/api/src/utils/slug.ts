@@ -1,11 +1,9 @@
-// import { PrismaClient } from "@prisma/client";
-
-type PrismaAgency = {
-  findUnique: (args: unknown) => Promise<unknown>;
-};
-
 type PrismaLike = {
-  agency: PrismaAgency;
+  agency: {
+    findUnique: (args: {
+      where: { slug: string };
+    }) => Promise<{ slug: string } | null>;
+  };
 };
 
 export const generateSlug = async (name: string,
