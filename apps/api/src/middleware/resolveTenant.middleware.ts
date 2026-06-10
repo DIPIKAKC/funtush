@@ -35,7 +35,7 @@ declare global {
 }
 
 export async function resolveTenant(
-  req: Request,        // ← Standard Request, not TenantRequest
+  req: Request,        
 >>>>>>> ed8e877
   res: Response,
   next: NextFunction
