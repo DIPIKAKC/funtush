@@ -1,19 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// ── Shared mock collection (same object every call) ───────────────────────────
-const mockCol = {
-  insertOne:      vi.fn().mockResolvedValue({ insertedId: "mock_id" }),
-  countDocuments: vi.fn().mockResolvedValue(0),
-  find:           vi.fn().mockReturnValue({
-    sort: vi.fn().mockReturnValue({
-      limit:   vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
-      toArray: vi.fn().mockResolvedValue([]),
+// ── Use vi.hoisted so mockCol is available when vi.mock is hoisted ────────────
+const { mockCol } = vi.hoisted(() => {
+  const col = {
+    insertOne:      vi.fn().mockResolvedValue({ insertedId: "mock_id" }),
+    countDocuments: vi.fn().mockResolvedValue(0),
+    find:           vi.fn().mockReturnValue({
+      sort: vi.fn().mockReturnValue({
+        limit:   vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
+        toArray: vi.fn().mockResolvedValue([]),
+      }),
     }),
-  }),
-  updateOne:   vi.fn().mockResolvedValue({ upsertedId: "mock_id" }),
-  distinct:    vi.fn().mockResolvedValue([]),
-  createIndex: vi.fn().mockResolvedValue("index_name"),
-};
+    updateOne:   vi.fn().mockResolvedValue({ upsertedId: "mock_id" }),
+    distinct:    vi.fn().mockResolvedValue([]),
+    createIndex: vi.fn().mockResolvedValue("index_name"),
+  };
+  return { mockCol: col };
+});
 
 vi.mock("../src/lib/mongo", () => ({
   getMongo: vi.fn().mockResolvedValue({
@@ -144,7 +147,7 @@ describe("upsertDailySummary()", () => {
 describe("bookingAnalyticsMiddleware", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("fires BOOKING_CONFIRMED event on confirmed booking response", async () => {
+  it("fires BOOKING_CONFIRMED event", async () => {
     const { bookingAnalyticsMiddleware } = await import("../src/middleware/bookingAnalytics.middleware");
     const req = { agencyId: "agency_xyz", method: "PATCH", path: "/bookings/1/status", params: {} } as never;
     const res = { statusCode: 200, json: vi.fn().mockReturnThis() } as never;
