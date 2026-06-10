@@ -40,15 +40,33 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+enum PackageStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum DepartureStatus {
+  AVAILABLE
+  FULL
+  GUARANTEED
+}
+
+enum TrekDifficulty {
+  EASY
+  MODERATE
+  CHALLENGING
+  DIFFICULT
+}
 
 model SubscriptionTier {
-  id           String   @id @default(uuid())
-  name         String   @unique
-  maxStaff     Int      @map("max_staff")
-  maxGuides    Int      @map("max_guides")
-  monthlyPrice Decimal  @map("monthly_price") @db.Decimal(10, 2)
-  features     Json
-  agencies     Agency[]
+  id            String         @id @default(uuid())
+  name          String         @unique
+  maxStaff      Int            @map("max_staff")
+  maxGuides     Int            @map("max_guides")
+  monthlyPrice  Decimal        @map("monthly_price") @db.Decimal(10, 2)
+  features      Json
+  agencies      Agency[]
   subscriptions Subscription[]
 
   @@map("subscription_tiers")
@@ -66,11 +84,13 @@ model Agency {
   mapsUrl        String?          @map("maps_url")
   trialExpiresAt DateTime?        @map("trial_expires_at")
   createdAt      DateTime         @default(now()) @map("created_at")
-  
-  users             AgencyUser[]
-  profile           AgencyProfile?
-  kyc               KycSubmission?
-  subscriptions  Subscription[]
+
+  users         AgencyUser[]
+  profile       AgencyProfile?
+  kyc           KycSubmission?
+  subscriptions Subscription[]
+  packages      TrekPackage[]
+  destinations  TrekDestination[]
 
   @@map("agencies")
 }
@@ -133,19 +153,18 @@ model RolePermission {
   @@map("role_permissions")
 }
 
-
 model AgencyProfile {
-  id          String  @id @default(uuid())
+  id String @id @default(uuid())
 
-  agencyId    String  @unique @map("agency_id")
+  agencyId String @unique @map("agency_id")
 
   logo        String?
   description String?
   address     String?
 
-  phone       Json?
-  email       Json?
-  regions     Json?
+  phone   Json?
+  email   Json?
+  regions Json?
 
   logoShowOnWebsite        Boolean @default(true)
   descriptionShowOnWebsite Boolean @default(true)
@@ -154,60 +173,142 @@ model AgencyProfile {
   regionsShowOnWebsite     Boolean @default(true)
   addressShowOnWebsite     Boolean @default(true)
 
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  agency      Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
 
   @@map("agency_profiles")
 }
 
 model KycSubmission {
-  id              String   @id @default(uuid())
-  agencyId String @unique @map("agency_id")
+  id              String    @id @default(uuid())
+  agencyId        String    @unique @map("agency_id")
   status          KycStatus @default(SUBMITTED)
-  rejectionReason String?  @map("rejection_reason")
+  rejectionReason String?   @map("rejection_reason")
 
-  submittedAt     DateTime @default(now()) @map("submitted_at")
-  reviewedAt      DateTime? @map("reviewed_at")
-  reviewedBy      String?  @map("reviewed_by")
+  submittedAt DateTime  @default(now()) @map("submitted_at")
+  reviewedAt  DateTime? @map("reviewed_at")
+  reviewedBy  String?   @map("reviewed_by")
 
-  agency          Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
 
-  documents       KycDocument[]
+  documents KycDocument[]
 
   @@map("kyc_submissions")
 }
 
 model KycDocument {
-  id        String @id @default(uuid())
+  id String @id @default(uuid())
 
-  kycId     String @map("kyc_id")
-  type      KycDocumentType
-  fileUrl   String @map("file_url")
+  kycId   String          @map("kyc_id")
+  type    KycDocumentType
+  fileUrl String          @map("file_url")
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  kyc       KycSubmission @relation(fields: [kycId], references: [id], onDelete: Cascade)
+  kyc KycSubmission @relation(fields: [kycId], references: [id], onDelete: Cascade)
 
   @@map("kyc_documents")
 }
 
 model Subscription {
-  id        String @id @default(uuid())
+  id String @id @default(uuid())
 
-  agencyId  String @map("agency_id")
-  tierId    String @map("tier_id")
+  agencyId String @map("agency_id")
+  tierId   String @map("tier_id")
 
-  status    SubscriptionStatus @default(ACTIVE)
+  status SubscriptionStatus @default(ACTIVE)
 
-  startDate DateTime @default(now()) @map("start_date")
+  startDate DateTime  @default(now()) @map("start_date")
   endDate   DateTime?
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  agency    Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  tier      SubscriptionTier @relation(fields: [tierId], references: [id])
+  agency Agency           @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  tier   SubscriptionTier @relation(fields: [tierId], references: [id])
 
   @@map("subscriptions")
+}
+
+model TrekPackage {
+  id             String         @id @default(uuid())
+  agencyId       String         @map("agency_id")          // tenant owner
+  title          String
+  description    String?                                   // optional → "?"
+  durationDays   Int            @map("duration_days")
+  pricePerPerson Decimal        @map("price_per_person") @db.Decimal(10, 2)  // money → Decimal, like monthly_price
+  difficulty     TrekDifficulty
+  maxGroupSize   Int            @map("max_group_size")
+  status         PackageStatus  @default(DRAFT)            // new packages start as drafts
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  agency         Agency         @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  itineraries    TrekItinerary[]
+  departureDates TrekDepartureDate[]
+  addOns         TrekAddOn[]
+  destinations   TrekDestination[]                          // implicit M2M (Concept 3)
+
+  @@index([agencyId])                                       // tenant queries hit this constantly
+  @@map("trek_packages")
+}
+
+model TrekDestination {
+  id         String   @id @default(uuid())
+  agencyId   String   @map("agency_id")
+  name       String
+  region     String?
+  altitudeM  Int?     @map("altitude_m")
+  bestSeason String?  @map("best_season")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  agency     Agency        @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  packages   TrekPackage[]                                  // other side of the M2M
+
+  @@index([agencyId])
+  @@map("trek_destinations")
+}
+
+model TrekItinerary {
+  id          String   @id @default(uuid())
+  packageId   String   @map("package_id")                  // no agency_id — inherits tenant via package
+  dayNumber   Int      @map("day_number")
+  location    String?
+  description String?
+  altitudeM   Int?     @map("altitude_m")
+
+  package     TrekPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId])
+  @@map("trek_itineraries")
+}
+
+model TrekDepartureDate {
+  id          String          @id @default(uuid())
+  packageId   String          @map("package_id")
+  startDate   DateTime        @map("start_date")
+  maxSlots    Int             @map("max_slots")
+  bookedSlots Int             @default(0) @map("booked_slots")   // starts at zero
+  status      DepartureStatus @default(AVAILABLE)
+
+  package     TrekPackage     @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId])
+  @@map("trek_departure_dates")
+}
+
+model TrekAddOn {
+  id        String      @id @default(uuid())
+  packageId String      @map("package_id")
+  name      String
+  price     Decimal     @db.Decimal(10, 2)
+  perPerson Boolean     @default(false) @map("per_person")       // image: "per_person (boolean)"
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  package   TrekPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId])
+  @@map("trek_add_ons")
 }
