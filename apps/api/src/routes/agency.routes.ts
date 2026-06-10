@@ -1,43 +1,92 @@
-import express from "express";
-import { acceptBooking, agencyKYCStatus, agencyKYCSubmission, getAgencyDashboard, SubscriptionTiers, publishPackage, registerAcency, updateAgencyDomain, updateAgencyProfile, updateAgencySubscription } from "../controllers/agency.controller";
-import { checkAgencyStatus } from "../middlewares/agencyAccess.middleware";
-import { authenticateWithRefreshToken } from "../middlewares/refreshTokenAuthentication";
-import { upload } from "@funtush/storage";
+import { Router } from "express";
+import {
+  listAgencies,
+  getAgencyProfile,
+  updateAgencyStatus,
+  updateAgencyTier,
+  issueBreakGlassToken,
+} from "../../services/admin.service";
 
-const router = express.Router();
+const router = Router();
 
-router.route("/agencies/register")
-    .post(registerAcency);
+router.get("/", async (req, res) => {
+  try {
+    const { tier, status, country, search, page, limit } = req.query;
+    const result = await listAgencies({
+      tier:    tier    as string | undefined,
+      status:  status  as string | undefined,
+      country: country as string | undefined,
+      search:  search  as string | undefined,
+      page:    page    ? parseInt(page  as string, 10) : undefined,
+      limit:   limit   ? parseInt(limit as string, 10) : undefined,
+    });
+    res.json(result);
+  } catch (err) {
+    console.error("[GET /admin/agencies]", err);
+    res.status(500).json({ error: "Failed to list agencies" });
+  }
+});
 
-router.route("/subscription-tiers")
-    .get(SubscriptionTiers);
+router.get("/:id", async (req, res) => {
+  try {
+    const profile = await getAgencyProfile(req.params.id);
+    if (!profile) { res.status(404).json({ error: "Agency not found" }); return; }
+    res.json(profile);
+  } catch (err) {
+    console.error("[GET /admin/agencies/:id]", err);
+    res.status(500).json({ error: "Failed to load agency profile" });
+  }
+});
 
-router.route("/bookings")
-    .patch(checkAgencyStatus, authenticateWithRefreshToken, acceptBooking);
+router.patch("/:id/status", async (req, res) => {
+  try {
+    const { status, reason } = req.body as { status?: string; reason?: string };
+    const validStatuses = ["ACTIVE", "SUSPENDED", "LOCKED"] as const;
+    type ValidStatus = typeof validStatuses[number];
 
-router.route("/packages")
-    .patch(checkAgencyStatus, authenticateWithRefreshToken, publishPackage);
+    if (!status || !(validStatuses as readonly string[]).includes(status)) {
+      res.status(400).json({ error: `status must be one of: ${validStatuses.join(", ")}` });
+      return;
+    }
+    if (!reason || typeof reason !== "string" || reason.trim() === "") {
+      res.status(400).json({ error: "reason is required" });
+      return;
+    }
+    const updated = await updateAgencyStatus(req.params.id, status as ValidStatus, reason.trim());
+    res.json(updated);
+  } catch (err) {
+    console.error("[PATCH /admin/agencies/:id/status]", err);
+    res.status(500).json({ error: "Failed to update agency status" });
+  }
+});
 
-router.route("/dashboard")
-    .get(authenticateWithRefreshToken, getAgencyDashboard);
+router.patch("/:id/tier", async (req, res) => {
+  try {
+    const { tier } = req.body as { tier?: string };
+    if (!tier || typeof tier !== "string") {
+      res.status(400).json({ error: "tier is required" });
+      return;
+    }
+    const updated = await updateAgencyTier(req.params.id, tier.trim());
+    res.json(updated);
+  } catch (err) {
+    console.error("[PATCH /admin/agencies/:id/tier]", err);
+    res.status(500).json({ error: "Failed to update agency tier" });
+  }
+});
 
-router.route("/agencies/me/subscribe")
-    .patch(authenticateWithRefreshToken, updateAgencySubscription);
-
-router.route("/agencies/me/profile")
-    .patch(authenticateWithRefreshToken, updateAgencyProfile);
-
-router.route("/agencies/me/domain")
-    .patch(authenticateWithRefreshToken, updateAgencyDomain);
-
-router.route("/agencies/me/kyc")
-    .get(agencyKYCStatus)
-    .post(authenticateWithRefreshToken,
-        upload.fields([
-            { name: "business_registration", maxCount: 1 },
-            { name: "pan_certificate", maxCount: 1 },
-            { name: "tourism_license", maxCount: 1 },
-            { name: "bank_details", maxCount: 1 },
-        ]), agencyKYCSubmission);
+router.post("/:id/break-glass", async (req, res) => {
+  try {
+    const issuedByIp =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.socket.remoteAddress ||
+      "unknown";
+    const result = await issueBreakGlassToken(req.params.id, issuedByIp);
+    res.status(201).json(result);
+  } catch (err) {
+    console.error("[POST /admin/agencies/:id/break-glass]", err);
+    res.status(500).json({ error: "Failed to issue break-glass token" });
+  }
+});
 
 export default router;

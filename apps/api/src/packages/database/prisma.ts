@@ -1,10 +1,8 @@
-// @ts-ignore
-import PrismaClientPkg from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
-const PrismaClient: any = (PrismaClientPkg as any).PrismaClient ?? PrismaClientPkg;
-const globalForPrisma = globalThis as unknown as { prisma: any };
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
-export const prisma: any =
+export const prisma: PrismaClient =
   globalForPrisma.prisma ?? new PrismaClient({ log: ["error"] });
 
 if (process.env.NODE_ENV !== "production") {
