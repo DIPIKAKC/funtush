@@ -42,7 +42,7 @@ export async function getDashboardStats() {
     ]);
 
   const stats = {
- agenciesByTier: (agenciesByTier as any[]).reduce((acc: Record<string, number>, row: any) => {
+agenciesByTier: (agenciesByTier as Array<{ tier: string; _count: { _all: number } }>).reduce((acc: Record<string, number>, row) => {
   acc[row.tier] = row._count._all;
   return acc;
 }, {} as Record<string, number>),
