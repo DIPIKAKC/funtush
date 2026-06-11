@@ -6,7 +6,7 @@ import {
   publishPackageService,
   duplicatePackageService,
   archivePackageService,
-} from "../services/package.service";
+} from "../services/package.service.js";
 
 // helper: maps a thrown Error (with optional .status) to the right HTTP code.
 // "not found" errors carry status 404; validation errors have none → fall back to 400.

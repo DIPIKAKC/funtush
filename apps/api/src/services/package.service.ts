@@ -1,6 +1,24 @@
 import { db } from "@funtush/database";
 import { validatePackageInput } from "../utils/validator";
 
+// TrekPackage.slug is @unique and required — derive it from the title and
+// append a counter until it's unique within the trek_packages table.
+const generatePackageSlug = async (title: string): Promise<string> => {
+  const baseSlug = title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-");
+
+  let slug = baseSlug;
+  let counter = 1;
+  while (await db.trekPackage.findUnique({ where: { slug } })) {
+    counter++;
+    slug = `${baseSlug}-${counter}`;
+  }
+  return slug;
+};
+
 interface CreatePackageInput {
   title: string;
   description?: string;
@@ -20,6 +38,7 @@ export const createPackageService = async (agencyId: string, data: CreatePackage
     data: {
       agencyId,                          // tenant owner — from the token, NOT the body
       title: data.title,
+      slug: await generatePackageSlug(data.title),
       description: data.description,
       durationDays: data.durationDays,
       pricePerPerson: data.pricePerPerson,
@@ -156,6 +175,7 @@ export const duplicatePackageService = async (agencyId: string, packageId: strin
     data: {
       agencyId,                              // tenant owner (the caller, from the token)
       title: `Copy of ${source.title}`,
+      slug: await generatePackageSlug(`Copy of ${source.title}`),
       description: source.description,
       durationDays: source.durationDays,
       pricePerPerson: source.pricePerPerson,
