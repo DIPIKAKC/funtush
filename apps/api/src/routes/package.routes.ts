@@ -1,7 +1,7 @@
 import express from "express";
-import { authenticateWithRefreshToken } from "../middlewares/refreshTokenAuthentication";
+import { authenticateWithRefreshToken } from "../middlewares/refreshTokenAuthentication.js";
 import { createPackage, updatePackage, listPackages, publishPackage,
-         duplicatePackage, archivePackage } from "../controllers/package.controller";
+         duplicatePackage, archivePackage } from "../controllers/package.controller.js";
 
 const router = express.Router();
 
