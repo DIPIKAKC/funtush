@@ -1,9 +1,9 @@
 packages:
   - "apps/*"
   - "packages/*"
-  - "config"
 allowBuilds:
-  '@prisma/engines': false
-  bcrypt: false
+  '@prisma/client': true
+  '@prisma/engines': true
+  bcrypt: true
   esbuild: true
   prisma: false

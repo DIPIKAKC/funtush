@@ -1,3 +1,13 @@
+import { jwtPayload } from "@funtush/auth";
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: jwtPayload;
+    }
+  }
+}
+
 import { PrismaClient } from "@prisma/client";
 
 declare module "@funtush/database" {

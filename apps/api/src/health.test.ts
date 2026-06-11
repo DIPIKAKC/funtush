@@ -5,13 +5,16 @@ import type { AddressInfo } from "node:net";
 vi.stubEnv("REDIS_URL", "redis://127.0.0.1:6379");
 vi.stubEnv("DATABASE_URL", "postgresql://localhost:5432/funtush_test");
 
+
 const { mockDbQuery, mockRedisPing } = vi.hoisted(() => ({
-  mockDbQuery:   vi.fn(),
-  mockRedisPing: vi.fn(),
+  mockDbQuery:   vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+  mockRedisPing: vi.fn().mockResolvedValue("PONG"),
 }));
 
 vi.mock("@funtush/database", () => ({
-  db:    { $queryRaw: mockDbQuery },
+  db: {
+    $queryRaw: (...args: unknown[]) => mockDbQuery(...args),
+  },
   redis: { ping: mockRedisPing },
 }));
 
@@ -52,7 +55,7 @@ let server: Server;
 let baseUrl: string;
 
 beforeAll(async () => {
-  const { default: app } = await import("./app");
+  const { default: app } = await import("./app.js");
 
   await new Promise<void>((resolve) => {
     server = app.listen(0, () => {
@@ -67,9 +70,31 @@ afterAll(() => {
   if (server) server.close();
 });
 
+
 describe("GET /health", () => {
   it("returns 200 ok", async () => {
     const res = await fetch(`${baseUrl}/health`);
+    const body = await res.json();
     expect(res.status).toBe(200);
+    expect(body).toEqual({
+      status: "ok",
+      db: "ok",
+      redis: "ok",
+    });
+  });
+
+  it("returns 503 when a dependency is down", async () => {
+    mockDbQuery.mockRejectedValueOnce(new Error("connection refused"));
+    mockRedisPing.mockResolvedValueOnce("PONG");
+
+    const res = await fetch(`${baseUrl}/health`);
+    const body = await res.json();
+
+    expect(res.status).toBe(503);
+    expect(body).toEqual({
+      status: "error",
+      db: "error",
+      redis: "ok",
+    });
   });
 });

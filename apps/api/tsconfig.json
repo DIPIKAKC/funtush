@@ -1,14 +1,27 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "target": "ES2020",
-    "module": "commonjs",
-    "moduleResolution": "bundler",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "types": ["vitest/globals"]
+    "target": "ESNext",
+    "types": ["node"],
+    "moduleResolution": "NodeNext",
+    "module": "NodeNext",
+    "baseUrl": ".",
+    "paths": {
+      "@funtush/auth": [
+        "../../packages/auth/src/index.ts"
+      ],
+      "@funtush/database": [
+        "../../packages/database/src/index.ts"
+      ]
+    }
   },
-  "include": ["src/**/*", "test/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src",
+    "../../packages/auth/src/utils/lockout.ts",
+    "../../packages/auth/src/utils/redis.ts",
+    "../../packages/auth/src/utils/otpRateLimit.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ],
 }

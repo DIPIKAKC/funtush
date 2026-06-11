@@ -1,14 +1,14 @@
 import type { Request, Response } from "express";
-import { acceptBookingService, AgencyKYCService, agencySubscription, createAgency, getAgencyDashboardService, getSubscriptionTiers, KYCStatusService, publishPackageService, updateAgencyDomainService, updateAgencyProfileService } from "../services/agency.service";
-import type { UpdateDomainBody } from "../types/auth-request";
+import {  acceptBookingService, AgencyKYCService, agencySubscription, createAgency, getAgencyDashboardService, getSubscriptionTiers, KYCStatusService, publishPackageService, updateAgencyDomainService, updateAgencyProfileService } from "../services/agency.service.js";
 import { uploadFile } from "@funtush/storage";
+import type { UpdateDomainBody } from "../types/auth-request.js";
 
-export const registerAcency = async (req: Request, res: Response) => {
+export const registerAgency = async (req: Request, res: Response) => {
     try {
         const newAgency = await createAgency(req.body);
         res.status(201).json({
             status: "success",
-            data: newAgency
+            data: newAgency,
         });
     } catch (err) {
         res.status(500).json({

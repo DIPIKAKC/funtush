@@ -1,10 +1,9 @@
 import express from "express";
-import { registerAcency } from "../controllers/agency.controller";
+import { registerAgency } from "../controllers/agency.controller.js";
 
 const router = express.Router();
 
 router.route("/register")
-  .get(registerAcency);
-
+  .post(registerAgency);
 
 export default router;
