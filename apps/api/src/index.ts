@@ -1,23 +1,27 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import { MulterError } from "multer";
 import { db, redis } from "@funtush/database";
-import uploadRoutes from "./routes/upload.routes";
-
-import agencyRoutes from './routes/agency.routes';
-import { startSubscriptionCron } from "./jobs/subscriptionExpiry.job";
+import uploadRoutes from "./routes/upload.routes.js";
+import authRoutes from "./routes/auth.routes.js";
+import agencyRoutes from "./routes/agency.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
+import { startSubscriptionCron } from "./jobs/subscriptionExpiry.job.js";
 
 const app = express();
+// app.use(express.json())
 const port = Number(process.env.PORT ?? 4000);
 
 app.use(express.json());
 app.use("/", uploadRoutes);
 app.use('/', agencyRoutes);
+app.use("/auth", authRoutes);
+app.use('/', adminRoutes);
 
 
 // Liveness probe consumed by Prometheus / the load balancer.
 app.get("/health", async (_req: Request, res: Response) => {
   const [dbOk, redisOk] = await Promise.all([
-    db.query("SELECT 1").then(() => true).catch(() => false),
+    db.$queryRaw`SELECT 1`.then(() => true).catch(() => false),
     redis.ping().then((r) => r === "PONG").catch(() => false),
   ]);
 
