@@ -1,4 +1,4 @@
-import { getMongo } from "../lib/mongo";
+import { getMongo } from "../lib/mongo.js";
 
 export interface RequestLog {
   requestId:    string;

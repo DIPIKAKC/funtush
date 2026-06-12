@@ -1,5 +1,5 @@
-import { prisma } from "../packages/database/prisma";
-import { cacheGet, cacheSet, TENANT_TTL } from "./redis.service";
+import { prisma } from "../packages/database/prisma.js";
+import { cacheGet, cacheSet, TENANT_TTL } from "./redis.service.js";
 
 export interface TenantInfo {
   tenantId: string;

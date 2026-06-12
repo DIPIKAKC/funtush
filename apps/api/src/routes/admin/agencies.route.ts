@@ -5,7 +5,7 @@ import {
   updateAgencyStatus,
   updateAgencyTier,
   issueBreakGlassToken,
-} from "../../services/admin.service";
+} from "../../services/admin.service.js";
 
 const router = Router();
 

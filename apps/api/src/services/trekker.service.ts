@@ -1,7 +1,7 @@
 
 import bcrypt from 'bcrypt';
 import { db } from "@funtush/database";
-import { validateRegistrationInput } from "../utils/validator";
+import { validateRegistrationInput } from "../utils/validator.js";
 
 
 interface CreateTrekkerInput {
@@ -23,12 +23,12 @@ export const createTrekker = async (data: CreateTrekkerInput) => {
     // validation
     validateRegistrationInput({ email, password, phone });
 
-    // check duplicate email
-    const existing = await db.trekker.findUnique(
-        { where: { email }, }
-    );
+    // check duplicate USER (not trekker)
+    const existingUser = await db.user.findUnique({
+        where: { email },
+    });
 
-    if (existing) {
+    if (existingUser) {
         const error = new Error("Email already exists") as Error & { status?: number };
         error.status = 409;
         throw error;
@@ -39,17 +39,25 @@ export const createTrekker = async (data: CreateTrekkerInput) => {
         10
     );
 
-    // create agency
+    // create USER
+    const user = await db.user.create({
+        data: {
+            email,
+            passwordHash: hashedPassword,
+            role: "STAFF",
+            roleType: "TREKKER",
+        },
+    });
+
+    // create TREKKER profile
     const trekker = await db.trekker.create({
         data: {
-            name,
-            email,
-            password,
-            passwordHash: hashedPassword,
+            userId: user.id,
+            fullName: name,
             phone,
             country,
-            emergency_contact_name,
-            emergency_contact_phone
+            emergencyContact: emergency_contact_phone,
+            emergencyContactName: emergency_contact_name,
         },
     });
 
@@ -70,14 +78,14 @@ interface trekkerPreferenceInput {
     budget_range: string;
     group_size_preference: string;
 }
-export const trekkerPreferenceService = async (data: trekkerPreferenceInput, id:string) => {
+export const trekkerPreferenceService = async (data: trekkerPreferenceInput, id: string) => {
     const {
         trekkerId, preferred_destinations, budget_range, group_size_preference
     } = data;
 
     // check duplicate email
     const existing = await db.trekkerPreference.findUnique(
-        { where: {  id  }, }
+        { where: { id }, }
     );
 
     if (!existing) {

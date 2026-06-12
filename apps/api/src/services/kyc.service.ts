@@ -1,5 +1,5 @@
-import { prisma } from "../packages/database/prisma";
-import { queueEmail, getEmailQueue, EmailStatus } from "../lib/emailQueue";
+import { prisma } from "../packages/database/prisma.js";
+import { queueEmail, getEmailQueue, EmailStatus } from "../lib/emailQueue.js";
 
 /**
  * Returns all pending KYC submissions in submission order.

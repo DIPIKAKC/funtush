@@ -36,12 +36,18 @@ async function main() {
     }
   ];
 
+  let freeTierId = "";
+
   for (const tier of tiers) {
-    await prisma.subscriptionTier.upsert({
+    const createdTier = await prisma.subscriptionTier.upsert({
       where: { name: tier.name },
       update: tier,
       create: tier
     });
+
+    if (tier.name === "FREE") {
+      freeTierId = createdTier.id;
+    }
   }
 
   const passwordHash = await bcrypt.hash("Test@123", 10);
@@ -115,7 +121,15 @@ async function main() {
       name: "Default Agency",
       email: "agency@funtush.com",
       slug: "default-agency",
+<<<<<<< HEAD
       tier: { connect: { id: freeTier.id } }
+=======
+      tier: {
+        connect: {
+          id: freeTierId,
+        },
+      },
+>>>>>>> f7321ea (fix: migration files + controllers + services)
     }
   });
 
@@ -131,4 +145,4 @@ main()
   });
 
 
-  // Seeded Super Admin: admin@funtush.com (password: ChangeMe123!)
+// Seeded Super Admin: admin@funtush.com (password: ChangeMe123!)
