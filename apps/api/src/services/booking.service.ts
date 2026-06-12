@@ -233,7 +233,7 @@ export async function getAgencyBookings(
 ) {
   const where = {
     agencyId,
-    ...(status ? { status: status as any } : {}),
+    ...(status ? { status: status as string } : {}),
   };
 
   const [bookings, total] = await Promise.all([
@@ -268,20 +268,20 @@ export async function acceptBooking(bookingId: string, agencyId: string) {
   const urlToken = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-  const [updatedBooking] = await prisma.$transaction([
-    prisma.booking.update({
-      where: { id: bookingId },
-      data: { status: "CONFIRMED" },
-    }),
-    prisma.paymentLink.create({
-      data: {
-        bookingId,
-        urlToken,
-        amount: booking.totalPrice,
-        expiresAt,
-      },
-    }),
-  ]);
+  // const [updatedBooking] = await prisma.$transaction([
+  //   prisma.booking.update({
+  //     where: { id: bookingId },
+  //     data: { status: "CONFIRMED" },
+  //   }),
+  //   prisma.paymentLink.create({
+  //     data: {
+  //       bookingId,
+  //       urlToken,
+  //       amount: booking.totalPrice,
+  //       expiresAt,
+  //     },
+  //   }),
+  // ]);
 
   const paymentUrl = `${process.env.APP_URL}/pay/${urlToken}`;
 
