@@ -95,7 +95,7 @@ async function main() {
       nationality: "Nepali",
       isEmailVerified: true,
       isActive: true,
-      tier: { connect: { id: freeTier.id } }
+      tier: { connect: { id: freeTierId} }
     }
   });
 
