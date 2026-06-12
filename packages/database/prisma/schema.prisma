@@ -167,7 +167,8 @@ model Trekker {
   phone            String?
   country          String?
   nationality      String?
-  emergencyContact String?
+  emergencyContactName String?
+  emergencyContactPhone String?
 
   isEmailVerified Boolean   @default(false)
   emailVerifiedAt DateTime?
@@ -181,8 +182,29 @@ model Trekker {
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookings Booking[]
 
-  @@map("trekkers")
+  preference TrekkerPreference?
+
+  @@map("trekker")
 }
+
+
+model TrekkerPreference {
+  id        String   @id @default(uuid())
+
+  trekkerId String   @unique @map("trekker_id")
+
+  preferredDestinations Json? @map("preferred_destinations")
+  budgetRange           Json? @map("budget_range")
+  groupSizePreference   Int?  @map("group_size_preference")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  trekker Trekker @relation(fields: [trekkerId], references: [id], onDelete: Cascade)
+
+  @@map("trekker_preferences")
+}
+
 
 model RefreshToken {
   id        String   @id @default(uuid())

@@ -1,4 +1,4 @@
-import { redis } from "../lib/redis";
+import { redis } from "../lib/redis.js";
 
 export interface RateLimitConfig {
   maxRequests: number;  

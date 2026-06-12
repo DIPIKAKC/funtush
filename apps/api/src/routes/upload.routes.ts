@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { upload } from "@funtush/storage";
 import { requireAuth } from "@funtush/auth";
-import { uploadSingle, uploadMultiple, deleteUpload } from "../controllers/upload.controller";
+import { uploadSingle, uploadMultiple, deleteUpload } from "../controllers/upload.controller.js";
 
 const router = Router();
 

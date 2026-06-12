@@ -20,12 +20,13 @@ export const createAgency = async (data: CreateAgencyInput) => {
   // validation
   validateRegistrationInput({ email, password, phone });
 
-  // check duplicate email
-  const existing = await db.agencyUser.findUnique(
-    { where: { email }, }
-  );
+  // check duplicate USER (NOT agencyUser)
+  const existingUser = await db.user.findUnique({
+    where: { email },
+  });
 
-  if (existing) {
+
+  if (existingUser) {
     const error = new Error("Email already exists") as Error & { status?: number };
     error.status = 409;
     throw error;
@@ -42,9 +43,15 @@ export const createAgency = async (data: CreateAgencyInput) => {
     10
   );
 
-  const rawRefreshToken = crypto.randomBytes(64).toString("hex");
-  const tokenHash = await bcrypt.hash(rawRefreshToken, 10);
-
+  //create USER first
+  const user = await db.user.create({
+    data: {
+      email,
+      passwordHash: hashedPassword,
+      role: "AGENCY_ADMIN",
+      roleType: "TENANT",
+    },
+  });
 
   // create agency
   const agency = await db.agency.create({
@@ -64,15 +71,19 @@ export const createAgency = async (data: CreateAgencyInput) => {
   });
 
 
-  // create admin user
-  const user = await db.agencyUser.create({
+  // link user ↔ agency (AgencyUser)
+  await db.agencyUser.create({
     data: {
       agencyId: agency.id,
-      email,
-      passwordHash: hashedPassword,
+      userId: user.id,
       role: "AGENCY_ADMIN",
     },
   });
+
+
+  const rawRefreshToken = crypto.randomBytes(64).toString("hex");
+  const tokenHash = await bcrypt.hash(rawRefreshToken, 10);
+
 
   const refreshToken = await db.refreshToken.create({
     data: {

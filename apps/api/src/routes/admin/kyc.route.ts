@@ -4,7 +4,7 @@ import {
   getKycSubmission,
   approveKycSubmission,
   rejectKycSubmission,
-} from "../../services/kyc.service";
+} from "../../services/kyc.service.js";
 
 const router = Router();
 

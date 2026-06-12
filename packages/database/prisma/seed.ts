@@ -11,12 +11,18 @@ async function main() {
     { name: "LARGE", maxStaff: 50, maxGuides: 200, monthlyPrice: 299, features: { marketplace: true, blog: true, ads: true } }
   ];
 
+  let freeTierId = "";
+
   for (const tier of tiers) {
-    await prisma.subscriptionTier.upsert({
+    const createdTier = await prisma.subscriptionTier.upsert({
       where: { name: tier.name },
       update: tier,
       create: tier
     });
+
+    if (tier.name === "FREE") {
+      freeTierId = createdTier.id;
+    }
   }
 
   const passwordHash = await bcrypt.hash("Test@123", 10);
@@ -70,7 +76,7 @@ async function main() {
     }
   });
 
-  // ← THIS is what was missing — link agency user to agency via AgencyUser
+  // link agency user to agency via AgencyUser
   await prisma.agencyUser.upsert({
     where: { agencyId_userId: { agencyId: agency.id, userId: agencyUser.id } },
     update: { role: UserRole.AGENCY_ADMIN },
@@ -89,6 +95,7 @@ async function main() {
       nationality: "Nepali",
       isEmailVerified: true,
       isActive: true,
+      tier: { connect: { id: freeTier.id } }
     }
   });
 
