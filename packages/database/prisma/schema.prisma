@@ -7,6 +7,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Enums
+
 enum AgencyStatus {
   TRIAL
   ACTIVE
@@ -18,6 +20,25 @@ enum UserRole {
   SUPER_ADMIN
   AGENCY_ADMIN
   STAFF
+}
+
+enum RoleType {
+  PLATFORM
+  TENANT
+  TREKKER
+}
+
+enum BookingStatus {
+  INQUIRY
+  PENDING
+  CONFIRMED
+  PAYMENT_PENDING
+  REJECTED
+  ALTERNATIVE_PROPOSED
+  PAID
+  ACTIVE
+  COMPLETED
+  CANCELLED
 }
 
 enum KycStatus {
