@@ -365,7 +365,7 @@ model BookingAddOn {
   priceAtBooking Decimal @map("price_at_booking") @db.Decimal(10, 2)
 
   booking Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  addOn   TrekAddOn @relation(fields: [addOnId], references: [id])
+  addOn TrekAddOn @relation(fields: [addOnId], references: [id], onDelete: Restrict)
 
   @@unique([bookingId, addOnId])
   @@map("booking_add_ons")

@@ -130,5 +130,26 @@ main()
     process.exit(1);
   });
 
+// Create trekker profile for test@auth.com
+const trekkerUser = await prisma.user.findUnique({
+  where: { email: "test@auth.com" }
+});
 
-  // Seeded Super Admin: admin@funtush.com (password: ChangeMe123!)
+if (trekkerUser) {
+  await prisma.trekker.upsert({
+    where: { userId: trekkerUser.id },
+    update: {},
+    create: {
+      userId: trekkerUser.id,
+      fullName: "Test Trekker",
+      phone: "9800000000",
+      country: "Nepal",
+      nationality: "Nepali",
+      isEmailVerified: true,
+      isActive: true,
+    }
+  });
+}
+
+
+// Seeded Super Admin: admin@funtush.com (password: ChangeMe123!)
