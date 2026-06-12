@@ -7,6 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+<<<<<<< HEAD
 model SubscriptionTier {
   id            String         @id @default(uuid())
   name          String         @unique
@@ -250,6 +251,9 @@ model Subscription {
 
   @@map("subscriptions")
 }
+=======
+// Enums
+>>>>>>> d909496 (feat: schema migration)
 
 enum AgencyStatus {
   TRIAL
@@ -262,6 +266,25 @@ enum UserRole {
   SUPER_ADMIN
   AGENCY_ADMIN
   STAFF
+}
+
+enum RoleType {
+  PLATFORM
+  TENANT
+  TREKKER
+}
+
+enum BookingStatus {
+  INQUIRY
+  PENDING
+  CONFIRMED
+  PAYMENT_PENDING
+  REJECTED
+  ALTERNATIVE_PROPOSED
+  PAID
+  ACTIVE
+  COMPLETED
+  CANCELLED
 }
 
 enum KycStatus {
@@ -369,7 +392,10 @@ model User {
   trekker Trekker?
 
   refreshTokens RefreshToken[]
+<<<<<<< HEAD
   fcmToken       String?   @map("fcm_token")  
+=======
+>>>>>>> d909496 (feat: schema migration)
   agencyUsers   AgencyUser[]
 
   failedAttempts Int       @default(0)
@@ -410,6 +436,28 @@ model Trekker {
   @@map("trekker")
 }
 
+<<<<<<< HEAD
+=======
+
+model TrekkerPreference {
+  id        String   @id @default(uuid())
+
+  trekkerId String   @unique @map("trekker_id")
+
+  preferredDestinations Json? @map("preferred_destinations")
+  budgetRange           Json? @map("budget_range")
+  groupSizePreference   Int?  @map("group_size_preference")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  trekker Trekker @relation(fields: [trekkerId], references: [id], onDelete: Cascade)
+
+  @@map("trekker_preferences")
+}
+
+
+>>>>>>> d909496 (feat: schema migration)
 model RefreshToken {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
@@ -505,6 +553,7 @@ model TrekDestination {
 }
 
 model TrekItinerary {
+<<<<<<< HEAD
   id          String   @id @default(uuid())
   packageId   String   @map("package_id")
   dayNumber   Int      @map("day_number")
@@ -512,6 +561,14 @@ model TrekItinerary {
   description String?
   altitudeM   Int?     @map("altitude_m")
   photos      String[] @default([])
+=======
+  id          String  @id @default(uuid())
+  packageId   String  @map("package_id")
+  dayNumber   Int     @map("day_number")
+  location    String?
+  description String?
+  altitudeM   Int?    @map("altitude_m")
+>>>>>>> d909496 (feat: schema migration)
 
   package TrekPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
 
@@ -552,6 +609,7 @@ model TrekAddOn {
 // Bookings & Payments
 
 model Booking {
+<<<<<<< HEAD
   id              String        @id @default(uuid())
   agencyId        String        @map("agency_id")
   trekkerId       String?       @map("trekker_id")
@@ -573,6 +631,29 @@ model Booking {
 
   agency        Agency            @relation(fields: [agencyId], references: [id])
   trekker       Trekker?          @relation(fields: [trekkerId], references: [id])
+=======
+  id                String   @id @default(uuid())
+  agencyId          String   @map("agency_id")
+  trekkerId         String   @map("trekker_id")
+  packageId         String   @map("package_id")
+  departureDateId   String   @map("departure_date_id")
+  groupSize         Int      @map("group_size")
+  totalPrice        Decimal  @map("total_price") @db.Decimal(10, 2)
+  status            BookingStatus @default(INQUIRY)
+  trekkerName       String   @map("trekker_name")
+  trekkerEmail      String   @map("trekker_email")
+  trekkerPhone      String   @map("trekker_phone")
+  trekkerCountry    String?  @map("trekker_country")
+  specialRequests   String?  @map("special_requests")
+  rejectionReason   String?  @map("rejection_reason")
+  proposedDate      DateTime? @map("proposed_date") @db.Date
+  assignedGuideId   String?  @map("assigned_guide_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  agency        Agency            @relation(fields: [agencyId], references: [id])
+  trekker       Trekker           @relation(fields: [trekkerId], references: [id])
+>>>>>>> d909496 (feat: schema migration)
   package       TrekPackage       @relation(fields: [packageId], references: [id])
   departureDate TrekDepartureDate @relation(fields: [departureDateId], references: [id])
 
