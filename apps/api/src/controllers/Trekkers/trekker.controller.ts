@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { createTrekker, trekkerPreferenceService } from "../../services/trekker.service";
+import { createTrekker, trekkerPreferenceService } from "src/services/trekker.service.js";
 
 export const registerTrekker= async(req:Request , res: Response) => {
     try {

@@ -4,7 +4,6 @@ import { db, redis } from "@funtush/database";
 import uploadRoutes from "./routes/upload.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import agencyRoutes from "./routes/agency.routes.js";
-import adminRoutes from "./routes/admin.routes.js";
 import { startSubscriptionCron } from "./jobs/subscriptionExpiry.job.js";
 
 const app = express();
@@ -15,8 +14,6 @@ app.use(express.json());
 app.use("/", uploadRoutes);
 app.use('/', agencyRoutes);
 app.use("/auth", authRoutes);
-app.use('/', adminRoutes);
-
 
 // Liveness probe consumed by Prometheus / the load balancer.
 app.get("/health", async (_req: Request, res: Response) => {

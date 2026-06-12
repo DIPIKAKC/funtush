@@ -146,6 +146,7 @@ model User {
   trekker Trekker?
 
   refreshTokens RefreshToken[]
+  fcmToken       String?   @map("fcm_token")  
   agencyUsers   AgencyUser[]
 
   failedAttempts Int       @default(0)
@@ -166,7 +167,8 @@ model Trekker {
   phone            String?
   country          String?
   nationality      String?
-  emergencyContact String?
+  emergencyContactName String?
+  emergencyContactPhone String?
 
   isEmailVerified Boolean   @default(false)
   emailVerifiedAt DateTime?
@@ -180,8 +182,29 @@ model Trekker {
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookings Booking[]
 
-  @@map("trekkers")
+  preference TrekkerPreference?
+
+  @@map("trekker")
 }
+
+
+model TrekkerPreference {
+  id        String   @id @default(uuid())
+
+  trekkerId String   @unique @map("trekker_id")
+
+  preferredDestinations Json? @map("preferred_destinations")
+  budgetRange           Json? @map("budget_range")
+  groupSizePreference   Int?  @map("group_size_preference")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  trekker Trekker @relation(fields: [trekkerId], references: [id], onDelete: Cascade)
+
+  @@map("trekker_preferences")
+}
+
 
 model RefreshToken {
   id        String   @id @default(uuid())
@@ -278,12 +301,13 @@ model TrekDestination {
 }
 
 model TrekItinerary {
-  id          String  @id @default(uuid())
-  packageId   String  @map("package_id")
-  dayNumber   Int     @map("day_number")
+  id          String   @id @default(uuid())
+  packageId   String   @map("package_id")
+  dayNumber   Int      @map("day_number")
   location    String?
   description String?
-  altitudeM   Int?    @map("altitude_m")
+  altitudeM   Int?     @map("altitude_m")
+  photos      String[] @default([])
 
   package TrekPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
 
@@ -324,27 +348,27 @@ model TrekAddOn {
 // Bookings & Payments
 
 model Booking {
-  id                String   @id @default(uuid())
-  agencyId          String   @map("agency_id")
-  trekkerId         String   @map("trekker_id")
-  packageId         String   @map("package_id")
-  departureDateId   String   @map("departure_date_id")
-  groupSize         Int      @map("group_size")
-  totalPrice        Decimal  @map("total_price") @db.Decimal(10, 2)
-  status            BookingStatus @default(INQUIRY)
-  trekkerName       String   @map("trekker_name")
-  trekkerEmail      String   @map("trekker_email")
-  trekkerPhone      String   @map("trekker_phone")
-  trekkerCountry    String?  @map("trekker_country")
-  specialRequests   String?  @map("special_requests")
-  rejectionReason   String?  @map("rejection_reason")
-  proposedDate      DateTime? @map("proposed_date") @db.Date
-  assignedGuideId   String?  @map("assigned_guide_id")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id              String        @id @default(uuid())
+  agencyId        String        @map("agency_id")
+  trekkerId       String?       @map("trekker_id")
+  packageId       String        @map("package_id")
+  departureDateId String        @map("departure_date_id")
+  groupSize       Int           @map("group_size")
+  totalPrice      Decimal       @map("total_price") @db.Decimal(10, 2)
+  status          BookingStatus @default(INQUIRY)
+  trekkerName     String        @map("trekker_name")
+  trekkerEmail    String        @map("trekker_email")
+  trekkerPhone    String        @map("trekker_phone")
+  trekkerCountry  String?       @map("trekker_country")
+  specialRequests String?       @map("special_requests")
+  rejectionReason String?       @map("rejection_reason")
+  proposedDate    DateTime?     @map("proposed_date") @db.Date
+  assignedGuideId String?       @map("assigned_guide_id")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
 
   agency        Agency            @relation(fields: [agencyId], references: [id])
-  trekker       Trekker           @relation(fields: [trekkerId], references: [id])
+  trekker       Trekker?          @relation(fields: [trekkerId], references: [id])
   package       TrekPackage       @relation(fields: [packageId], references: [id])
   departureDate TrekDepartureDate @relation(fields: [departureDateId], references: [id])
 
@@ -364,7 +388,7 @@ model BookingAddOn {
   priceAtBooking Decimal @map("price_at_booking") @db.Decimal(10, 2)
 
   booking Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  addOn   TrekAddOn @relation(fields: [addOnId], references: [id])
+  addOn TrekAddOn @relation(fields: [addOnId], references: [id], onDelete: Restrict)
 
   @@unique([bookingId, addOnId])
   @@map("booking_add_ons")

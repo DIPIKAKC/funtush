@@ -1,26 +1,27 @@
 import { prisma, redis } from "@funtush/database";
 import { generateOTP } from "@funtush/auth";
-import { sendOtpEmail } from "../utils/email.js";
-import { sendInquiryConfirmationEmail, sendAgencyInquiryAlertEmail } from "../utils/email.js";
+import { sendAlternativeDateEmail, sendBookingAcceptedEmail, sendBookingRejectedEmail, sendOtpEmail } from "../utils/email";
+import { sendInquiryConfirmationEmail, sendAgencyInquiryAlertEmail } from "../utils/email";
+import { notifyAgencyAdmins, notifyTrekker } from "./notification.service.js";
+const { randomBytes } = await import("crypto");
 
 //Types
-
 export interface InquiryInput {
-  packageId:       string;
+  packageId: string;
   departureDateId: string;
-  groupSize:       number;
-  addOns?:         { addOnId: string; quantity: number }[];
-  trekkerName:     string;
-  trekkerEmail:    string;
-  trekkerPhone:    string;
+  groupSize: number;
+  addOns?: { addOnId: string; quantity: number }[];
+  trekkerName: string;
+  trekkerEmail: string;
+  trekkerPhone: string;
   trekkerCountry?: string;
   specialRequests?: string;
 }
 
 // Redis key helpers
-const otpKey   = (token: string) => `inquiry:otp:${token}`;
-const dataKey  = (token: string) => `inquiry:data:${token}`;
-const TTL      = 15 * 60; // 15 minutes
+const otpKey = (token: string) => `inquiry:otp:${token}`;
+const dataKey = (token: string) => `inquiry:data:${token}`;
+const TTL = 15 * 60; // 15 minutes
 
 //  validate, store temp, send OTP 
 export async function submitInquiry(input: InquiryInput) {
@@ -72,14 +73,14 @@ export async function submitInquiry(input: InquiryInput) {
   // Calculate total price
   const addOnsWithPrice = input.addOns?.length
     ? await prisma.trekAddOn.findMany({
-        where: { id: { in: input.addOns.map((a) => a.addOnId) } },
-      })
+      where: { id: { in: input.addOns.map((a) => a.addOnId) } },
+    })
     : [];
 
   const basePrice = Number(pkg.pricePerPerson) * groupSize;
-  const addOnTotal = addOnsWithPrice.reduce((sum, addOn) => {
+  const addOnTotal = addOnsWithPrice.reduce((sum: number, addOn: { id: string; price: unknown; perPerson: boolean }) => {
     const line = input.addOns!.find((a) => a.addOnId === addOn.id)!;
-    const qty  = line.quantity;
+    const qty = line.quantity;
     return sum + Number(addOn.price) * (addOn.perPerson ? groupSize * qty : qty);
   }, 0);
 
@@ -148,16 +149,16 @@ export async function verifyInquiryOtp(sessionToken: string, otp: string) {
   // Save booking to DB with status INQUIRY
   const booking = await prisma.booking.create({
     data: {
-      agencyId:        data.agencyId,
-      packageId:       data.packageId,
+      agencyId: data.agencyId,
+      packageId: data.packageId,
       departureDateId: data.departureDateId,
-      groupSize:       data.groupSize,
-      totalPrice:      data.totalPrice,
-      status:          "INQUIRY",
-      trekkerName:     data.trekkerName,
-      trekkerEmail:    data.trekkerEmail,
-      trekkerPhone:    data.trekkerPhone,
-      trekkerCountry:  data.trekkerCountry,
+      groupSize: data.groupSize,
+      totalPrice: data.totalPrice,
+      status: "INQUIRY",
+      trekkerName: data.trekkerName,
+      trekkerEmail: data.trekkerEmail,
+      trekkerPhone: data.trekkerPhone,
+      trekkerCountry: data.trekkerCountry,
       specialRequests: data.specialRequests,
       // addOns saved separately below
     },
@@ -175,11 +176,11 @@ export async function verifyInquiryOtp(sessionToken: string, otp: string) {
 
     await prisma.bookingAddOn.createMany({
       data: data.addOns.map((a) => {
-        const addOn = addOns.find((x) => x.id === a.addOnId)!;
+        const addOn = addOns.find((x: { id: string }) => x.id === a.addOnId)!;
         return {
-          bookingId:      booking.id,
-          addOnId:        a.addOnId,
-          quantity:       a.quantity,
+          bookingId: booking.id,
+          addOnId: a.addOnId,
+          quantity: a.quantity,
           priceAtBooking: addOn.price,
         };
       }),
@@ -206,10 +207,187 @@ export async function verifyInquiryOtp(sessionToken: string, otp: string) {
     booking.id,
   );
 
+  await notifyAgencyAdmins(data.agencyId, {
+    title: "New Inquiry Received",
+    body: `New inquiry from ${data.trekkerName} for ${booking.package.title}`,
+    data: {
+      bookingId: booking.id,
+      type: "NEW_INQUIRY",
+      link: `/dashboard/bookings/${booking.id}`,
+    },
+  });
+
   return {
     bookingId: booking.id,
-    status:    "INQUIRY",
-    message:   "Your inquiry has been submitted. The agency will confirm within 24 hours.",
+    status: "INQUIRY",
+    message: "Your inquiry has been submitted. The agency will confirm within 24 hours.",
   };
 }
 
+// GET /agencies/me/bookings
+export async function getAgencyBookings(
+  agencyId: string,
+  status?: string,
+  page = 1,
+  limit = 20,
+) {
+  const where = {
+    agencyId,
+    ...(status ? { status: status as string } : {}),
+  };
+
+  const [bookings, total] = await Promise.all([
+    prisma.booking.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        package: { select: { title: true, slug: true } },
+        departureDate: { select: { startDate: true } },
+        addOns: { include: { addOn: true } },
+      },
+    }),
+    prisma.booking.count({ where }),
+  ]);
+
+  return { bookings, total, page, limit };
+}
+
+// PATCH /bookings/:id/accept
+export async function acceptBooking(bookingId: string, agencyId: string) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { package: true },
+  });
+
+  if (!booking) throw new Error("Booking not found");
+  if (booking.agencyId !== agencyId) throw new Error("Unauthorized");
+  if (booking.status !== "INQUIRY") throw new Error("Booking is not in INQUIRY state");
+
+  const urlToken = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+  // const [updatedBooking] = await prisma.$transaction([
+  //   prisma.booking.update({
+  //     where: { id: bookingId },
+  //     data: { status: "CONFIRMED" },
+  //   }),
+  //   prisma.paymentLink.create({
+  //     data: {
+  //       bookingId,
+  //       urlToken,
+  //       amount: booking.totalPrice,
+  //       expiresAt,
+  //     },
+  //   }),
+  // ]);
+
+  const paymentUrl = `${process.env.APP_URL}/pay/${urlToken}`;
+
+  await sendBookingAcceptedEmail(
+    booking.trekkerEmail,
+    booking.trekkerName,
+    booking.package.title,
+    paymentUrl,
+    expiresAt,
+  );
+
+  if (booking.trekkerId) {
+    await notifyTrekker(booking.trekkerId, {
+      title: "Booking Confirmed!",
+      body: `Your booking for ${booking.package.title} has been confirmed. Please complete payment within 48 hours.`,
+      data: { bookingId, type: "BOOKING_CONFIRMED", link: `/bookings/${bookingId}` },
+    });
+  }
+
+  return { bookingId, status: "CONFIRMED", paymentUrl, expiresAt };
+}
+
+// PATCH /bookings/:id/reject
+export async function rejectBooking(
+  bookingId: string,
+  agencyId: string,
+  reason: string,
+) {
+  if (!reason?.trim()) throw new Error("Rejection reason is required");
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { package: true },
+  });
+
+  if (!booking) throw new Error("Booking not found");
+  if (booking.agencyId !== agencyId) throw new Error("Unauthorized");
+  if (!["INQUIRY", "CONFIRMED"].includes(booking.status)) {
+    throw new Error("Booking cannot be rejected in its current state");
+  }
+
+  await prisma.booking.update({
+    where: { id: bookingId },
+    data: { status: "REJECTED", rejectionReason: reason },
+  });
+
+  await sendBookingRejectedEmail(
+    booking.trekkerEmail,
+    booking.trekkerName,
+    booking.package.title,
+    reason,
+  );
+
+  if (booking.trekkerId) {
+    await notifyTrekker(booking.trekkerId, {
+      title: "Booking Update",
+      body: `Your inquiry for ${booking.package.title} was not accepted.`,
+      data: { bookingId, type: "BOOKING_REJECTED", link: `/bookings/${bookingId}` },
+    });
+  }
+
+  return { bookingId, status: "REJECTED" };
+}
+
+// PATCH /bookings/:id/propose-date
+export async function proposeAlternativeDate(
+  bookingId: string,
+  agencyId: string,
+  proposedDate: string,
+) {
+  if (!proposedDate) throw new Error("Proposed date is required");
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { package: true },
+  });
+
+  if (!booking) throw new Error("Booking not found");
+  if (booking.agencyId !== agencyId) throw new Error("Unauthorized");
+  if (booking.status !== "INQUIRY") throw new Error("Booking is not in INQUIRY state");
+
+  const date = new Date(proposedDate);
+  if (isNaN(date.getTime())) throw new Error("Invalid date format");
+
+  await prisma.booking.update({
+    where: { id: bookingId },
+    data: {
+      status: "ALTERNATIVE_PROPOSED",
+      proposedDate: date,
+    },
+  });
+
+  await sendAlternativeDateEmail(
+    booking.trekkerEmail,
+    booking.trekkerName,
+    booking.package.title,
+    date,
+  );
+
+  if (booking.trekkerId) {
+    await notifyTrekker(booking.trekkerId, {
+      title: "Alternative Date Proposed",
+      body: `The agency has proposed a new date for ${booking.package.title}.`,
+      data: { bookingId, type: "ALTERNATIVE_PROPOSED", link: `/bookings/${bookingId}` },
+    });
+  }
+
+  return { bookingId, status: "ALTERNATIVE_PROPOSED", proposedDate: date };
+}

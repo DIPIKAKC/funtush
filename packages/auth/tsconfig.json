@@ -1,16 +1,21 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "../..",
     "outDir": "./dist",
     "composite": true,
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
     "baseUrl": ".",
     "paths": {
-      "@funtush/database": ["../../packages/database/src/index.ts"]
+      "@funtush/database": [
+        "../database/src/index.ts"
+      ]
     },
     "noEmit": true
   },
-  "include": ["src", "../database/src/**/*.ts", "../../apps/api/src/types/express.d.ts"]
+  "references": [
+    { "path": "../database" }
+  ],
+  "include": [
+    "src",
+    "../../apps/api/src/types/express.d.ts"
+  ]
 }

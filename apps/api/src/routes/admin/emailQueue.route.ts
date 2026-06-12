@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { listEmailQueue } from "../../services/kyc.service";
-import type { EmailStatus } from "../../lib/emailQueue";
+import { listEmailQueue } from "../../services/kyc.service.js";
+import type { EmailStatus } from "../../lib/emailQueue.js";
 
 
 

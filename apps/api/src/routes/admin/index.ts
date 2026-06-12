@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { requireAdmin } from "../../middleware/requireAdmin.middleware";
-import dashboardRouter from "./dashboard.route";
-import agenciesRouter  from "./agencies.route";
+import { requireAdmin } from "../../middleware/requireAdmin.middleware.js";
+import dashboardRouter from "./dashboard.route.js";
+import agenciesRouter  from "./agencies.route.js";
 
 const router = Router();
 

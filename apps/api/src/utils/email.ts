@@ -131,3 +131,79 @@ Please log in to your dashboard to review and respond.
     `,
   });
 };
+
+export const sendBookingAcceptedEmail = async (
+  email: string,
+  trekkerName: string,
+  packageTitle: string,
+  paymentLink: string,
+  expiresAt: Date,
+) => {
+  await transporter.sendMail({
+    from: `"Funtush" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: "Your booking has been confirmed!",
+    text: `
+Hi ${trekkerName},
+
+Great news! Your booking for "${packageTitle}" has been confirmed.
+
+Please complete your payment within 48 hours using the link below:
+${paymentLink}
+
+Payment link expires: ${expiresAt.toDateString()}
+
+Thank you!
+    `,
+  });
+};
+
+export const sendBookingRejectedEmail = async (
+  email: string,
+  trekkerName: string,
+  packageTitle: string,
+  reason: string,
+) => {
+  await transporter.sendMail({
+    from: `"Funtush" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: "Update on your booking inquiry",
+    text: `
+Hi ${trekkerName},
+
+Unfortunately your inquiry for "${packageTitle}" could not be accepted.
+
+Reason: ${reason}
+
+You're welcome to browse other available packages.
+
+Thank you,
+Funtush Team
+    `,
+  });
+};
+
+export const sendAlternativeDateEmail = async (
+  email: string,
+  trekkerName: string,
+  packageTitle: string,
+  proposedDate: Date,
+) => {
+  await transporter.sendMail({
+    from: `"Funtush" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: "Alternative date proposed for your booking",
+    text: `
+Hi ${trekkerName},
+
+The agency has proposed an alternative departure date for "${packageTitle}".
+
+Proposed date: ${proposedDate.toDateString()}
+
+Please log in to your dashboard to accept or decline.
+
+Thank you,
+Funtush Team
+    `,
+  });
+};

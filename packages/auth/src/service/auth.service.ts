@@ -1,19 +1,19 @@
-import { comparePassword } from "../password.js";
+import { comparePassword } from "../password";
 import {
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
-} from "../jwt.js";
+} from "../jwt";
 import {
   isLocked,
   registerFailedAttempt,
   resetAttempts,
-} from "../utils/lockout.js";
-import { hashToken } from "../utils/hashToken.js";
+} from "../utils/lockout";
+import { hashToken } from "../utils/hashToken";
 import { prisma } from "@funtush/database";
-import { jwtPayload } from "../types.js";
-import { redis } from "../utils/redis.js";
-import { checkOtpRateLimit } from "../utils/otpRateLimit.js";
+import { jwtPayload } from "../types";
+import { redis } from "../utils/redis";
+import { checkOtpRateLimit } from "../utils/otpRateLimit";
 
 function expiry(days: number) {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
@@ -76,7 +76,15 @@ export async function agencyLogin(email: string, password: string) {
 
   const user = await prisma.user.findUnique({
     where: { email },
-    include: { agency: true },
+    include: {
+      agencyUsers: {
+        include: {
+          agency: true,
+        }
+      },
+      trekker: true,
+      refreshTokens: true,
+    }
   });
 
   if (!user || user.role !== "AGENCY_ADMIN") {
@@ -84,12 +92,14 @@ export async function agencyLogin(email: string, password: string) {
     throw new Error("Invalid credentials");
   }
 
-  if (!user.agency) {
+  const agency = user.agencyUsers[0]?.agency;
+
+  if (!agency) {
     await registerFailedAttempt(email);
     throw new Error("Invalid credentials");
   }
 
-  if (["LOCKED", "SUSPENDED"].includes(user.agency.status)) {
+  if (["LOCKED", "SUSPENDED"].includes(agency.status)) {
     throw new Error("Agency blocked");
   }
 
@@ -106,7 +116,7 @@ export async function agencyLogin(email: string, password: string) {
     userId: user.id,
     roleType: "TENANT",
     role: user.role,
-    agencyId: user.agency.id,
+    agencyId: agency.id,
   });
 
   const refreshToken = generateRefreshToken(user.id);
@@ -206,6 +216,11 @@ export async function refreshTokenService(refreshToken: string) {
   // get user
   const user = await prisma.user.findUnique({
     where: { id: userId },
+    include: {
+      agencyUsers: {
+        include: { agency: true }
+      }
+    }
   });
 
   if (!user || !user.roleType) {
@@ -213,11 +228,13 @@ export async function refreshTokenService(refreshToken: string) {
   }
 
   // create new tokens
+  const agencyId = user.agencyUsers?.[0]?.agencyId ?? undefined;
+
   const newAccessToken = generateAccessToken({
     userId: user.id,
     roleType: user.roleType,
     role: user.role,
-    agencyId: user.agencyId ?? undefined,
+    agencyId,
   });
 
   const newRefreshToken = generateRefreshToken(user.id);
