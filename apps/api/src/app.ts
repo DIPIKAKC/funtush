@@ -6,6 +6,7 @@ import { requestLogger } from "./middleware/requestLogger.middleware";
 import adminRouter from "./routes/admin/index";
 import agencyRoutes from "./routes/agency.routes";
 import bookingRoutes from "./routes/booking.routes";
+import paymentWebhookRoutes from "./routes/payment.webhook.routes";
 import { startSubscriptionCron } from "./jobs/subscriptionExpiry.job";
 
 const app = express();
@@ -37,6 +38,7 @@ app.use(rateLimitMiddleware);
 app.use("/admin", adminRouter);
 app.use("/", agencyRoutes);
 app.use("/bookings", bookingRoutes);
+app.use("/webhooks/payment", paymentWebhookRoutes);
 
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   startSubscriptionCron();

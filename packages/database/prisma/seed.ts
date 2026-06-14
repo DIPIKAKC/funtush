@@ -95,11 +95,70 @@ async function main() {
       nationality: "Nepali",
       isEmailVerified: true,
       isActive: true,
-      tier: { connect: { id: freeTier.id } }
     }
   });
 
+  // Test package + departure date for E2E booking flow 
+  const testPackage = await prisma.trekPackage.upsert({
+    where: { slug: "everest-base-camp-test" },
+    update: { status: "PUBLISHED" },
+    create: {
+      agencyId: agency.id,
+      title: "Everest Base Camp Trek (Test)",
+      slug: "everest-base-camp-test",
+      description: "Test package for E2E booking flow testing.",
+      durationDays: 14,
+      pricePerPerson: 1200,
+      difficulty: "CHALLENGING",
+      maxGroupSize: 10,
+      status: "PUBLISHED",
+    },
+  });
+
+  const departureDate = await prisma.trekDepartureDate.upsert({
+    where: { id: "00000000-0000-0000-0000-000000000001" },
+    update: { bookedSlots: 0, status: "AVAILABLE" },
+    create: {
+      id: "00000000-0000-0000-0000-000000000001",
+      packageId: testPackage.id,
+      startDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      maxSlots: 10,
+      bookedSlots: 0,
+      status: "AVAILABLE",
+    },
+  });
+
+  // Itinerary days for PDF generation test
+  await prisma.trekItinerary.upsert({
+    where: { id: "00000000-0000-0000-0000-000000000101" },
+    update: {},
+    create: {
+      id: "00000000-0000-0000-0000-000000000101",
+      packageId: testPackage.id,
+      dayNumber: 1,
+      location: "Kathmandu to Lukla to Phakding",
+      description: "Fly to Lukla, trek to Phakding.",
+      altitudeM: 2610,
+    },
+  });
+
+  await prisma.trekItinerary.upsert({
+    where: { id: "00000000-0000-0000-0000-000000000102" },
+    update: {},
+    create: {
+      id: "00000000-0000-0000-0000-000000000102",
+      packageId: testPackage.id,
+      dayNumber: 2,
+      location: "Phakding to Namche Bazaar",
+      description: "Trek through pine forests to Namche Bazaar.",
+      altitudeM: 3440,
+    },
+  });
+
   console.log("seed completed");
+  console.log("Test package ID:", testPackage.id);
+  console.log("Test departure date ID:", departureDate.id);
+  console.log("Test agency ID:", agency.id);
 }
 
 main()

@@ -1,10 +1,10 @@
+import { randomBytes } from "crypto";
 import { prisma, redis, type Prisma } from "@funtush/database";
 import { generateOTP } from "@funtush/auth";
 import { sendAlternativeDateEmail, sendBookingAcceptedEmail, sendBookingRejectedEmail, sendOtpEmail } from "../utils/email";
 import { sendInquiryConfirmationEmail, sendAgencyInquiryAlertEmail } from "../utils/email";
 import { notifyAgencyAdmins, notifyTrekker } from "./notification.service.js";
 import { confirmSlotsForBooking } from "./departureDate.service.js";
-const { randomBytes } = await import("crypto");
 
 //Types
 export interface InquiryInput {
@@ -22,7 +22,7 @@ export interface InquiryInput {
 // Redis key helpers
 const otpKey = (token: string) => `inquiry:otp:${token}`;
 const dataKey = (token: string) => `inquiry:data:${token}`;
-const TTL = 15 * 60; // 15 minutes
+const TTL = 15 * 60; 
 
 //  validate, store temp, send OTP 
 export async function submitInquiry(input: InquiryInput) {

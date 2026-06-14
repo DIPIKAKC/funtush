@@ -208,33 +208,79 @@ Funtush Team
   });
 };
 
-export const sendStaffInviteEmail = async (
-  email: string,
-  tempPassword: string,
-  agencyName: string
+export const sendBookingConfirmationEmail = async (
+  trekkerEmail: string,
+  trekkerName: string,
+  packageTitle: string,
+  departureDate: Date,
+  bookingId: string,
+  guideName: string | null,
+  pdfBuffer: Buffer
 ) => {
-  try {
-    await transporter.sendMail({
-      from: `"Funtush System" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "You have been invited to join Funtush",
-      text: `
-Hello,
+  await transporter.sendMail({
+    from: `"Funtush" <${process.env.EMAIL_USER}>`,
+    to: trekkerEmail,
+    subject: `Booking Confirmed — ${packageTitle}`,
+    text: `
+Hi ${trekkerName},
 
-You have been invited to join ${agencyName} on Funtush.
+Your payment has been received and your booking is confirmed!
 
-Your login credentials:
-  Email: ${email}
-  Temporary Password: ${tempPassword}
+Package: ${packageTitle}
+Departure: ${departureDate.toDateString()}
+Booking ID: ${bookingId}
+${guideName ? `Assigned Guide: ${guideName}` : "Your guide will be assigned shortly and you will be notified."}
 
-Please log in and change your password immediately after first login.
+Please find your full booking confirmation and itinerary attached as a PDF.
+
+Safe trekking!
+Funtush Team
+    `.trim(),
+    attachments: [
+      {
+        filename: `booking-confirmation-${bookingId}.pdf`,
+        content: pdfBuffer,
+        contentType: "application/pdf",
+      },
+    ],
+  });
+};
+
+export const sendGuideAssignmentEmail = async (
+  guideEmail: string,
+  guideName: string,
+  packageTitle: string,
+  departureDate: Date,
+  trekkerName: string,
+  trekkerPhone: string,
+  trekkerCountry: string | null,
+  groupSize: number,
+  bookingId: string
+) => {
+  await transporter.sendMail({
+    from: `"Funtush" <${process.env.EMAIL_USER}>`,
+    to: guideEmail,
+    subject: `Trek Assignment — ${packageTitle}`,
+    text: `
+Hi ${guideName},
+
+You have been assigned to lead a trek.
+
+Package: ${packageTitle}
+Departure: ${departureDate.toDateString()}
+Booking ID: ${bookingId}
+
+Trekker Details:
+  Name: ${trekkerName}
+  Phone: ${trekkerPhone}
+  Country: ${trekkerCountry ?? "Not specified"}
+  Group Size: ${groupSize}
+
+Please prepare accordingly and contact the trekker if needed before the departure date.
 
 Thank you,
 Funtush Team
-      `,
-    });
-  } catch (error) {
-    console.error("Staff invite email sending failed:", error);
-    throw error;
-  }
+    `.trim(),
+  });
 };
+
