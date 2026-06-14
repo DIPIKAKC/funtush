@@ -102,7 +102,8 @@ async function main() {
     });
   }
 
-  const freeTier = await prisma.subscriptionTier.upsert({
+  // const freeTier = 
+  await prisma.subscriptionTier.upsert({
     where: { name: "FREE" },
     update: {},
     create: {

@@ -94,6 +94,7 @@ CREATE TABLE "trekker_preferences" (
     CONSTRAINT "trekker_preferences_pkey" PRIMARY KEY ("id")
 );
 
+
 -- CreateTable
 CREATE TABLE "bookings" (
     "id" TEXT NOT NULL,
