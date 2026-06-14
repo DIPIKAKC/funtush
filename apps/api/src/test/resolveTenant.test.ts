@@ -6,8 +6,8 @@ vi.mock("../src/services/tenant.service", () => ({
   getTenantByCustomDomain: vi.fn(),
 }));
 
-import { getTenantBySubdomain, getTenantByCustomDomain } from "../src/services/tenant.service";
-import { resolveTenant } from "../src/middleware/resolveTenant.middleware";
+import { getTenantBySubdomain, getTenantByCustomDomain } from "../services/tenant.service";
+import { resolveTenant } from "../middleware/resolveTenant.middleware";
 
 function mockReqRes(host: string, ip = "127.0.0.1") {
   const req: any = {

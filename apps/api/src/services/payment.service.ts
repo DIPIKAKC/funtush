@@ -1,4 +1,4 @@
-import { prisma, type Prisma, BookingStatus, DepartureStatus } from "@funtush/database";
+import { prisma, type Prisma, BookingStatus } from "@funtush/database";
 import { generateBookingConfirmationPDF } from "../lib/generatePDF";
 import { sendBookingConfirmationEmail, sendGuideAssignmentEmail } from "../utils/email";
 
@@ -7,7 +7,7 @@ export async function processConfirmedPayment(
   agencyId: string,
   amountPaid: number
 ): Promise<void> {
-  // ── 1. Load booking with all relations needed ──────────────────────────────
+
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
@@ -31,9 +31,9 @@ export async function processConfirmedPayment(
 
   if (!booking) throw new Error(`Booking ${bookingId} not found`);
   if (booking.agencyId !== agencyId) throw new Error("Agency mismatch on booking");
-  if (booking.status === BookingStatus.PAID) return; // idempotent — already processed
+  if (booking.status === BookingStatus.PAID) return; 
 
-  // ── 2. Verify amount matches booking total ─────────────────────────────────
+  // 1. Verify payment amount matches booking total
   const expectedAmount = Number(booking.totalPrice);
   if (Math.abs(amountPaid - expectedAmount) > 0.01) {
     throw new Error(
@@ -41,7 +41,7 @@ export async function processConfirmedPayment(
     );
   }
 
-  // ── 3. Auto-assign guide if agency has auto-assignment configured ──────────
+  // ── 3. Auto-assign guide if agency has auto-assignment configured 
   // TODO: replace with your Guide model query once the Guide model exists
   // Example:
   //   const guide = await prisma.guide.findFirst({
@@ -57,7 +57,7 @@ export async function processConfirmedPayment(
   const assignedGuidePhone: string | null = null;
   const assignedGuideEmail: string | null = null;
 
-  // Atomic DB update — booking PAID + slot decrement ───────────────────
+  // Atomic DB update — booking PAID + slot decrement 
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.booking.update({
       where: { id: bookingId },
@@ -73,19 +73,6 @@ export async function processConfirmedPayment(
       data: { used: true },
     });
 
-    const updatedDeparture = await tx.trekDepartureDate.update({
-      where: { id: booking.departureDateId },
-      data: {
-        bookedSlots: { increment: booking.groupSize },
-      },
-    });
-
-    if (updatedDeparture.bookedSlots >= updatedDeparture.maxSlots) {
-      await tx.trekDepartureDate.update({
-        where: { id: booking.departureDateId },
-        data: { status: DepartureStatus.FULL },
-      });
-    }
   });
 
   // Generate booking confirmation PDF with all details
@@ -122,7 +109,7 @@ export async function processConfirmedPayment(
     })),
   });
 
-  // 6. Send confirmation email to trekker ─────────────────────────────────
+  // Send confirmation email to trekker with PDF attachment
   await sendBookingConfirmationEmail(
     booking.trekkerEmail,
     booking.trekkerName,
@@ -133,7 +120,7 @@ export async function processConfirmedPayment(
     pdfBuffer
   );
 
-  // ── 7. Send assignment notification to guide ──────────────────────────────
+  // Send assignment notification to guide 
   if (assignedGuideEmail && assignedGuideName) {
     await sendGuideAssignmentEmail(
       assignedGuideEmail,

@@ -21,8 +21,8 @@ vi.mock("../src/services/redis.service", () => ({
   TENANT_TTL: 300,
 }));
 
-import { getDashboardStats, issueBreakGlassToken } from "../src/services/admin.service";
-import { prisma } from "../src/packages/database/prisma";
+import { getDashboardStats, issueBreakGlassToken } from "../services/admin.service";
+import { prisma } from "../packages/database/prisma";
 
 describe("Admin dashboard", () => {
 
@@ -127,7 +127,7 @@ describe("Break-glass token", () => {
   });
 
   it("stores token in Redis with 1800s TTL", async () => {
-    const { cacheSet } = await import("../src/services/redis.service");
+    const { cacheSet } = await import("../services/redis.service");
     vi.mocked(prisma.breakGlassToken.create).mockResolvedValue({ id: "bg_2" } as never);
     vi.mocked(prisma.agency.findUnique).mockResolvedValue({ email: "a@b.com", name: "Test" } as never);
 

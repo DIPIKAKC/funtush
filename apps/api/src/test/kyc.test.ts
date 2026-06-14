@@ -28,8 +28,8 @@ import {
   approveKycSubmission,
   rejectKycSubmission,
   listEmailQueue,
-} from "../src/services/kyc.service";
-import { prisma } from "../src/packages/database/prisma";
+} from "../services/kyc.service";
+import { prisma } from "../packages/database/prisma";
 
 const PENDING_SUBMISSION = {
   id:          "kyc_001",

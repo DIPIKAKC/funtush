@@ -21,7 +21,7 @@ import {
   updateDepartureDateService,
   deleteDepartureDateService,
   confirmSlotsForBooking,
-} from "../src/services/departureDate.service";
+} from "../services/departureDate.service";
 
 const AGENCY = "agency_1";
 const PKG = "pkg_1";

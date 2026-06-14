@@ -12,8 +12,8 @@ vi.mock("../src/lib/redis", () => ({
   },
 }));
 
-import { checkRateLimit, SOS_PATHS, RATE_LIMITS } from "../src/services/rateLimit.service";
-import { rateLimitMiddleware } from "../src/middleware/rateLimit.middleware";
+import { checkRateLimit, SOS_PATHS, RATE_LIMITS } from "../services/rateLimit.service";
+import { rateLimitMiddleware } from "../middleware/rateLimit.middleware";
 
 interface MockRes {
   _status: number;
@@ -145,7 +145,7 @@ describe("Rate limiting", () => {
   });
 
   it("middleware skips Redis entirely for SOS paths", async () => {
-    const { redis } = await import("../src/lib/redis");
+    const { redis } = await import("../lib/redis");
     const { req, res, next } = mockReqRes("POST", "/sos", "10.0.0.9");
     await rateLimitMiddleware(req as never, res as never, next);
     expect(redis.incr).not.toHaveBeenCalled();
@@ -153,7 +153,7 @@ describe("Rate limiting", () => {
   });
 
   it("Redis down → fail open, request allowed", async () => {
-    const { redis } = await import("../src/lib/redis");
+    const { redis } = await import("../lib/redis");
     vi.mocked(redis.incr).mockRejectedValueOnce(new Error("ECONNREFUSED"));
     const result = await checkRateLimit("10.0.0.10", "GET", "/api/data");
     expect(result.allowed).toBe(true);
