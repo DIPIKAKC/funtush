@@ -1,9 +1,10 @@
-import { prisma, redis } from "@funtush/database";
+import { randomBytes } from "crypto";
+import { prisma, redis, type Prisma } from "@funtush/database";
 import { generateOTP } from "@funtush/auth";
 import { sendAlternativeDateEmail, sendBookingAcceptedEmail, sendBookingRejectedEmail, sendOtpEmail } from "../utils/email";
 import { sendInquiryConfirmationEmail, sendAgencyInquiryAlertEmail } from "../utils/email";
 import { notifyAgencyAdmins, notifyTrekker } from "./notification.service.js";
-const { randomBytes } = await import("crypto");
+import { confirmSlotsForBooking } from "./departureDate.service.js";
 
 //Types
 export interface InquiryInput {
@@ -21,7 +22,7 @@ export interface InquiryInput {
 // Redis key helpers
 const otpKey = (token: string) => `inquiry:otp:${token}`;
 const dataKey = (token: string) => `inquiry:data:${token}`;
-const TTL = 15 * 60; // 15 minutes
+const TTL = 15 * 60; 
 
 //  validate, store temp, send OTP 
 export async function submitInquiry(input: InquiryInput) {
@@ -268,20 +269,25 @@ export async function acceptBooking(bookingId: string, agencyId: string) {
   const urlToken = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-  // const [updatedBooking] = await prisma.$transaction([
-  //   prisma.booking.update({
-  //     where: { id: bookingId },
-  //     data: { status: "CONFIRMED" },
-  //   }),
-  //   prisma.paymentLink.create({
-  //     data: {
-  //       bookingId,
-  //       urlToken,
-  //       amount: booking.totalPrice,
-  //       expiresAt,
-  //     },
-  //   }),
-  // ]);
+  // Confirm the booking, book the seats, and issue the payment link as ONE atomic
+  // unit. confirmSlotsForBooking re-checks capacity under the transaction and flips
+  // the date to FULL when this booking fills it — so two agencies confirming the
+  // last seats can't both succeed (no overbooking).
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await confirmSlotsForBooking(tx, booking.departureDateId, booking.groupSize);
+    await tx.booking.update({
+      where: { id: bookingId },
+      data: { status: "CONFIRMED" },
+    });
+    await tx.paymentLink.create({
+      data: {
+        bookingId,
+        urlToken,
+        amount: booking.totalPrice,
+        expiresAt,
+      },
+    });
+  });
 
   const paymentUrl = `${process.env.APP_URL}/pay/${urlToken}`;
 

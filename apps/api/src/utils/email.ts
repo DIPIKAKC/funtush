@@ -207,3 +207,80 @@ Funtush Team
     `,
   });
 };
+
+export const sendBookingConfirmationEmail = async (
+  trekkerEmail: string,
+  trekkerName: string,
+  packageTitle: string,
+  departureDate: Date,
+  bookingId: string,
+  guideName: string | null,
+  pdfBuffer: Buffer
+) => {
+  await transporter.sendMail({
+    from: `"Funtush" <${process.env.EMAIL_USER}>`,
+    to: trekkerEmail,
+    subject: `Booking Confirmed — ${packageTitle}`,
+    text: `
+Hi ${trekkerName},
+
+Your payment has been received and your booking is confirmed!
+
+Package: ${packageTitle}
+Departure: ${departureDate.toDateString()}
+Booking ID: ${bookingId}
+${guideName ? `Assigned Guide: ${guideName}` : "Your guide will be assigned shortly and you will be notified."}
+
+Please find your full booking confirmation and itinerary attached as a PDF.
+
+Safe trekking!
+Funtush Team
+    `.trim(),
+    attachments: [
+      {
+        filename: `booking-confirmation-${bookingId}.pdf`,
+        content: pdfBuffer,
+        contentType: "application/pdf",
+      },
+    ],
+  });
+};
+
+export const sendGuideAssignmentEmail = async (
+  guideEmail: string,
+  guideName: string,
+  packageTitle: string,
+  departureDate: Date,
+  trekkerName: string,
+  trekkerPhone: string,
+  trekkerCountry: string | null,
+  groupSize: number,
+  bookingId: string
+) => {
+  await transporter.sendMail({
+    from: `"Funtush" <${process.env.EMAIL_USER}>`,
+    to: guideEmail,
+    subject: `Trek Assignment — ${packageTitle}`,
+    text: `
+Hi ${guideName},
+
+You have been assigned to lead a trek.
+
+Package: ${packageTitle}
+Departure: ${departureDate.toDateString()}
+Booking ID: ${bookingId}
+
+Trekker Details:
+  Name: ${trekkerName}
+  Phone: ${trekkerPhone}
+  Country: ${trekkerCountry ?? "Not specified"}
+  Group Size: ${groupSize}
+
+Please prepare accordingly and contact the trekker if needed before the departure date.
+
+Thank you,
+Funtush Team
+    `.trim(),
+  });
+};
+
