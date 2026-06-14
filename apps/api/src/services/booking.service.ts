@@ -22,7 +22,7 @@ export interface InquiryInput {
 // Redis key helpers
 const otpKey = (token: string) => `inquiry:otp:${token}`;
 const dataKey = (token: string) => `inquiry:data:${token}`;
-const TTL = 15 * 60; // 15 minutes
+const TTL = 15 * 60; 
 
 //  validate, store temp, send OTP 
 export async function submitInquiry(input: InquiryInput) {
