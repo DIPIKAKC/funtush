@@ -585,3 +585,4 @@ ALTER TABLE "_TrekDestinationToTrekPackage" ADD CONSTRAINT "_TrekDestinationToTr
 
 -- AddForeignKey
 ALTER TABLE "_TrekDestinationToTrekPackage" ADD CONSTRAINT "_TrekDestinationToTrekPackage_B_fkey" FOREIGN KEY ("B") REFERENCES "trek_packages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- 

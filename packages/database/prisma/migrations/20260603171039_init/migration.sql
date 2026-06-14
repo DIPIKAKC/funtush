@@ -1,3 +1,4 @@
+-- 
 -- CreateEnum
 CREATE TYPE "AgencyStatus" AS ENUM ('TRIAL', 'ACTIVE', 'LOCKED', 'SUSPENDED');
 

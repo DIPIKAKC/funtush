@@ -24,3 +24,4 @@ ALTER TABLE "agency_staff" ADD CONSTRAINT "agency_staff_user_id_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "agency_staff" ADD CONSTRAINT "agency_staff_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+-- 

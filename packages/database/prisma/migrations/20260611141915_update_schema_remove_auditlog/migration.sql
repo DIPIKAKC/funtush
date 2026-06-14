@@ -26,3 +26,4 @@ CREATE UNIQUE INDEX "agency_staff_agency_id_user_id_key" ON "agency_staff"("agen
 
 -- AddForeignKey
 ALTER TABLE "agency_staff" ADD CONSTRAINT "agency_staff_agency_id_fkey" FOREIGN KEY ("agency_id") REFERENCES "agencies"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- 
