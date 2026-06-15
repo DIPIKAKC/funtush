@@ -115,7 +115,7 @@ async function main() {
     }
   });
 
-  await prisma.agency.upsert({
+  const testAgency = await prisma.agency.upsert({
     where: { email: "agency@funtush.com" },
     update: {},
     create: {
@@ -135,7 +135,7 @@ async function main() {
     where: { slug: "everest-base-camp-test" },
     update: { status: "PUBLISHED" },
     create: {
-      agencyId: agency.id,
+      agencyId: testAgency.id,
       title: "Everest Base Camp Trek (Test)",
       slug: "everest-base-camp-test",
       description: "Test package for E2E booking flow testing.",
@@ -190,7 +190,7 @@ async function main() {
   console.log("seed completed");
   console.log("Test package ID:", testPackage.id);
   console.log("Test departure date ID:", departureDate.id);
-  console.log("Test agency ID:", agency.id);
+  console.log("Test agency ID:", testPackage.agencyId);
 }
 
 main()
