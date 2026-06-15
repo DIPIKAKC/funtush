@@ -104,7 +104,7 @@ const totalBookings  = bookingEvents.filter((e: { event_type: string }) => e.eve
   };
 }
 
-// ── Package analytics ──────────────────────────────────────────────────────────
+// Package analytics
 
 export async function getPackageAnalytics(agency_id: string, range: DateRange) {
   const col    = await getAnalyticsCollection();
@@ -136,7 +136,7 @@ export async function getPackageAnalytics(agency_id: string, range: DateRange) {
   };
 }
 
-// ── Customer analytics ─────────────────────────────────────────────────────────
+// ── Customer analytics 
 
 export async function getCustomerAnalytics(agency_id: string, range: DateRange) {
   const col    = await getAnalyticsCollection();
@@ -190,7 +190,7 @@ export async function getCustomerAnalytics(agency_id: string, range: DateRange) 
   };
 }
 
-// ── Guide analytics ────────────────────────────────────────────────────────────
+// guid e analyis
 
 export async function getGuideAnalytics(agency_id: string, range: DateRange) {
   const col    = await getAnalyticsCollection();
