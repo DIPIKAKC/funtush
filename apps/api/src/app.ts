@@ -10,7 +10,7 @@ import paymentWebhookRoutes from "./routes/payment.webhook.routes";
 import { startSubscriptionCron } from "./jobs/subscriptionExpiry.job";
 import reportsRouter from "./routes/agency/reports.route";
 
-const app = express();
+const app = express();  
 
 app.use(express.json());
 app.use(requestLogger);
