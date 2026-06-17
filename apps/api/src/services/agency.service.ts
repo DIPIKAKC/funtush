@@ -307,6 +307,9 @@ export const updateAgencyProfileService = async (
   // helper to safely store JSON in Prisma
   const toJson = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
+
+  /** 
+   * 
   let maps_url: string | undefined;
 
   // Build Google Maps URL
@@ -315,6 +318,8 @@ export const updateAgencyProfileService = async (
       data.address
     )}&output=embed`;
   }
+
+    */
 
   // Map fields to db format (camelCase)
   if (data.logo !== undefined) updateData.logo = data.logo;
@@ -346,10 +351,13 @@ export const updateAgencyProfileService = async (
     updateData.regionsShowOnWebsite = data.regionsShowOnWebsite;
 
 
+  /** 
   // Add maps URL if address exists
   if (maps_url) {
     updateData.mapsUrl = maps_url;
   }
+*/
+
 
   if (Object.keys(updateData).length === 0) {
     return {

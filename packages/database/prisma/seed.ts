@@ -1,14 +1,39 @@
 import dotenv from "dotenv";
+
 dotenv.config({ path: ".env" });
 import bcrypt from "bcryptjs";
 import { prisma, UserRole, RoleType } from "@funtush/database";
 
 async function main() {
   const tiers = [
-    { name: "FREE", maxStaff: 1, maxGuides: 2, monthlyPrice: 0, features: { marketplace: false, blog: false, ads: false } },
-    { name: "SMALL", maxStaff: 3, maxGuides: 5, monthlyPrice: 29, features: { marketplace: true, blog: false, ads: false } },
-    { name: "MEDIUM", maxStaff: 10, maxGuides: 20, monthlyPrice: 99, features: { marketplace: true, blog: true, ads: false } },
-    { name: "LARGE", maxStaff: 50, maxGuides: 200, monthlyPrice: 299, features: { marketplace: true, blog: true, ads: true } }
+    {
+      name: "FREE",
+      maxStaff: 1,
+      maxGuides: 2,
+      monthlyPrice: 0,
+      features: { marketplace: false, blog: false, ads: false }
+    },
+    {
+      name: "SMALL",
+      maxStaff: 3,
+      maxGuides: 5,
+      monthlyPrice: 29,
+      features: { marketplace: true, blog: false, ads: false }
+    },
+    {
+      name: "MEDIUM",
+      maxStaff: 10,
+      maxGuides: 20,
+      monthlyPrice: 99,
+      features: { marketplace: true, blog: true, ads: false }
+    },
+    {
+      name: "LARGE",
+      maxStaff: 50,
+      maxGuides: 200,
+      monthlyPrice: 299,
+      features: { marketplace: true, blog: true, ads: true }
+    }
   ];
 
   let freeTierId = "";
@@ -27,26 +52,41 @@ async function main() {
 
   const passwordHash = await bcrypt.hash("Test@123", 10);
 
-  // Create users
-  const adminUser = await prisma.user.upsert({
-    where: { email: "admin@funtush.com" },
-    update: { passwordHash, role: UserRole.SUPER_ADMIN, roleType: RoleType.PLATFORM },
-    create: { email: "admin@funtush.com", passwordHash, role: UserRole.SUPER_ADMIN, roleType: RoleType.PLATFORM }
-  });
+  const users = [
+    {
+      email: "admin@funtush.com",
+      role: UserRole.SUPER_ADMIN,
+      roleType: RoleType.PLATFORM
+    },
+    {
+      email: "agency@funtush.com",
+      role: UserRole.AGENCY_ADMIN,
+      roleType: RoleType.TENANT
+    },
+    {
+      email: "test@auth.com",
+      role: UserRole.STAFF,
+      roleType: RoleType.TREKKER
+    }
+  ];
 
-  const agencyUser = await prisma.user.upsert({
-    where: { email: "agency@funtush.com" },
-    update: { passwordHash, role: UserRole.AGENCY_ADMIN, roleType: RoleType.TENANT },
-    create: { email: "agency@funtush.com", passwordHash, role: UserRole.AGENCY_ADMIN, roleType: RoleType.TENANT }
-  });
+  for (const user of users) {
+    await prisma.user.upsert({
+      where: { email: user.email },
+      update: {
+        passwordHash,
+        role: user.role,
+        roleType: user.roleType
+      },
+      create: {
+        email: user.email,
+        passwordHash,
+        role: user.role,
+        roleType: user.roleType
+      }
+    });
+  }
 
-  const trekkerUser = await prisma.user.upsert({
-    where: { email: "test@auth.com" },
-    update: { passwordHash, role: UserRole.STAFF, roleType: RoleType.TREKKER },
-    create: { email: "test@auth.com", passwordHash, role: UserRole.STAFF, roleType: RoleType.TREKKER }
-  });
-
-  // Create permissions
   const permissions = [
     { key: "USER_READ", description: "Read users" },
     { key: "USER_WRITE", description: "Write users" },
@@ -62,40 +102,31 @@ async function main() {
     });
   }
 
-  // Create agency
-  const freeTier = await prisma.subscriptionTier.findUnique({ where: { name: "FREE" } });
+  // const freeTier = 
+  await prisma.subscriptionTier.upsert({
+    where: { name: "FREE" },
+    update: {},
+    create: {
+      name: "FREE",
+      maxStaff: 5,
+      maxGuides: 5,
+      monthlyPrice: 0,
+      features: {}
+    }
+  });
 
-  const agency = await prisma.agency.upsert({
+  const testAgency = await prisma.agency.upsert({
     where: { email: "agency@funtush.com" },
     update: {},
     create: {
       name: "Default Agency",
       email: "agency@funtush.com",
       slug: "default-agency",
-      tier: { connect: { id: freeTier!.id } }
-    }
-  });
-
-  // link agency user to agency via AgencyUser
-  await prisma.agencyUser.upsert({
-    where: { agencyId_userId: { agencyId: agency.id, userId: agencyUser.id } },
-    update: { role: UserRole.AGENCY_ADMIN },
-    create: { agencyId: agency.id, userId: agencyUser.id, role: UserRole.AGENCY_ADMIN }
-  });
-
-  // Create trekker profile
-  await prisma.trekker.upsert({
-    where: { userId: trekkerUser.id },
-    update: {},
-    create: {
-      userId: trekkerUser.id,
-      fullName: "Test Trekker",
-      phone: "9800000000",
-      country: "Nepal",
-      nationality: "Nepali",
-      isEmailVerified: true,
-      isActive: true,
-      tier: { connect: { id: freeTierId} }
+      tier: {
+        connect: {
+          id: freeTierId,
+        },
+      },
     }
   });
 
@@ -104,7 +135,7 @@ async function main() {
     where: { slug: "everest-base-camp-test" },
     update: { status: "PUBLISHED" },
     create: {
-      agencyId: agency.id,
+      agencyId: testAgency.id,
       title: "Everest Base Camp Trek (Test)",
       slug: "everest-base-camp-test",
       description: "Test package for E2E booking flow testing.",
@@ -156,10 +187,32 @@ async function main() {
     },
   });
 
+
+  const testBooking = await prisma.booking.upsert({
+    where: { id: "00000000-0000-0000-0000-000000000111" },
+    update: {},
+    create:
+    {
+      agencyId: "6c34f8d4-77ba-4c55-80f6-897e10277dd0",
+      trekkerId: "f3b41def-1fea-414c-aeb2-a1e5d980c204",
+      packageId: testPackage.id,
+      departureDateId: departureDate.id,
+      groupSize: 7,
+      totalPrice: 1700,
+      status: "CONFIRMED",
+      trekkerName: "John Doe",
+      trekkerEmail: "john@test.com",
+      trekkerPhone: "1111111111",
+    },
+
+  });
+
+
   console.log("seed completed");
   console.log("Test package ID:", testPackage.id);
   console.log("Test departure date ID:", departureDate.id);
-  console.log("Test agency ID:", agency.id);
+  console.log("Test agency ID:", testPackage.agencyId);
+  console.log("Test bookings ID:", testBooking.id);
 }
 
 main()
@@ -169,3 +222,6 @@ main()
     await prisma.$disconnect();
     process.exit(1);
   });
+
+
+// Seeded Super Admin: admin@funtush.com (password: ChangeMe123!)

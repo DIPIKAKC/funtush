@@ -220,7 +220,7 @@ export const agencyCustomerListService = async (agencyId: string, query: custome
    */
   const total = customers.length;
 
-  const start = (page - 1) * limit;
+  const start = Number(page - 1) * Number(limit);
 
   const paginatedCustomers = customers.slice(
     start,

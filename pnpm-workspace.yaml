@@ -9,3 +9,4 @@ allowBuilds:
   esbuild: true
   prisma: false
   protobufjs: false
+  puppeteer: false
