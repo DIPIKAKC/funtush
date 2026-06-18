@@ -1,6 +1,12 @@
 import type { Request, Response } from "express";
 import { verifyAccessToken } from "@funtush/auth";
 import { searchMarketplacePackages } from "../services/search.service.js";
+import {
+  listAgencies,
+  getAgencyProfile,
+  listDestinations,
+  getDestinationBySlug,
+} from "../services/marketplaceDirectory.service.js";
 
 /**
  * ── Marketplace search controller (Week 3 · Day 2) ──────────────────────────
@@ -81,6 +87,62 @@ export const searchMarketplace = async (req: Request, res: Response) => {
     return res.json({ success: true, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Search failed";
+    return res.status(500).json({ success: false, message });
+  }
+};
+
+/* ── Agency directory (Week 3 · Day 3) ───────────────────────────────────────
+ *
+ * All four handlers below are PUBLIC (no auth) and read-only. They power the
+ * browse-by-hand directory pages, backed by Postgres via the directory service.
+ */
+
+/** GET /marketplace/agencies — list all listable agencies. */
+export const getAgencies = async (_req: Request, res: Response) => {
+  try {
+    const data = await listAgencies();
+    return res.json({ success: true, data, meta: { total: data.length } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to load agencies";
+    return res.status(500).json({ success: false, message });
+  }
+};
+
+/** GET /marketplace/agencies/:slug — one agency's public profile. */
+export const getAgency = async (req: Request, res: Response) => {
+  try {
+    const agency = await getAgencyProfile(req.params.slug as string);
+    if (!agency) {
+      return res.status(404).json({ success: false, message: "Agency not found" });
+    }
+    return res.json({ success: true, data: agency });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to load agency";
+    return res.status(500).json({ success: false, message });
+  }
+};
+
+/** GET /marketplace/destinations — list all master destinations. */
+export const getDestinations = async (_req: Request, res: Response) => {
+  try {
+    const data = await listDestinations();
+    return res.json({ success: true, data, meta: { total: data.length } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to load destinations";
+    return res.status(500).json({ success: false, message });
+  }
+};
+
+/** GET /marketplace/destinations/:slug — master destination page. */
+export const getDestination = async (req: Request, res: Response) => {
+  try {
+    const destination = await getDestinationBySlug(req.params.slug as string);
+    if (!destination) {
+      return res.status(404).json({ success: false, message: "Destination not found" });
+    }
+    return res.json({ success: true, data: destination });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to load destination";
     return res.status(500).json({ success: false, message });
   }
 };
