@@ -5,7 +5,6 @@ import {
   getIncidentHistory,
   addAdminNote,
   exportIncident,
-  issueSafetyWarning,
 } from "../../services/sosMonitoring.service";
 import { writeAuditLog } from "../../services/auditLog.service";
 
