@@ -1,6 +1,6 @@
 import { uploadFile } from "@funtush/storage";
 import type { Request, Response } from "express";
-import { createReviewService } from "src/services/review.service";
+import { createReviewService, flagReviewService, getAgencyReview, respondToReviewService } from "src/services/review.service";
 
 export const createReview = async (
     req: Request,
@@ -25,6 +25,95 @@ export const createReview = async (
         return res.status(201).json({
             success: true,
             data: review,
+        });
+
+    } catch (err) {
+        return res.status(400).json({
+            success: false,
+            message: err,
+        });
+    }
+};
+
+
+export const getReviews = async (
+    req: Request,
+    res: Response
+) => {
+    try {
+        // const slug = req.params.slug as string;
+
+        const { slug } = req.params;
+
+        if (typeof slug !== "string") {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid slug",
+            });
+        }
+
+        const reviews = await getAgencyReview(slug);
+
+        return res.status(200).json({
+            success: true,
+            data: reviews,
+        });
+
+    } catch (err) {
+        return res.status(400).json({
+            success: false,
+            message: err,
+        });
+    }
+};
+
+export const reviewResponse = async (
+    req: Request,
+    res: Response
+) => {
+    try {
+
+        const agencyId = req.agencyId as string;
+        const reviewId = req.params.id as string;
+        const { responseText } = req.body;
+
+
+        const response = await respondToReviewService(
+            agencyId, reviewId, responseText
+        );
+
+        return res.status(201).json({
+            success: true,
+            data: response,
+        });
+
+    } catch (err) {
+        return res.status(400).json({
+            success: false,
+            message: err,
+        });
+    }
+};
+
+
+export const flagReview = async (
+    req: Request,
+    res: Response
+) => {
+    try {
+
+        const agencyId = req.agencyId as string;
+        const reviewId = req.params.id as string;
+        const { reason } = req.body;
+
+
+        const flaggedReview = await flagReviewService(
+            agencyId, reviewId, reason
+        );
+
+        return res.status(201).json({
+            success: true,
+            data: flaggedReview,
         });
 
     } catch (err) {
