@@ -14,12 +14,12 @@ import reviewRoutes from "./routes/review.route.js";
 import staffRoutes from "./routes/staff.routes";
 import adminRoutes from "./routes/admin/index.js";
 import agencyAnalyticsRoutes from "./routes/agencyAnalytics.routes.js";
+import fraudRouter from "./routes/admin/fraud.route.js";
 
 import { startVisibilityScoreCron } from "./jobs/visibilityScore.job.js";
 import { startSubscriptionCron } from "./jobs/subscriptionExpiry.job.js";
 import { configureIndexes } from "./services/search.service.js";
 import { db, redis, connectMongo } from "@funtush/database";
-
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -38,6 +38,7 @@ app.use("/bookings", bookingRoutes);
 app.use("/auth", authRoutes);
 app.use("/agencies/me/staff", staffRoutes);
 app.use("/admin", adminRoutes);
+app.use("/fraud", fraudRouter);
 
 // Analytics Routes
 app.use("/", agencyAnalyticsRoutes);
