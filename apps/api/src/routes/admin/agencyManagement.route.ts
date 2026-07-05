@@ -9,6 +9,7 @@ import {
   updateAgencyPriorityOverride,
 } from "../../services/adminAgency.service";
 import { writeAuditLog } from "../../services/auditLog.service";
+import { requireAdmin } from "../../middleware/requireAdmin.middleware";
 
 const router = Router();
 
@@ -21,12 +22,10 @@ function clientIp(req: Request): string {
 }
 
 function adminId(req: Request): string {
-  return (req as unknown as { adminId?: string }).adminId ?? "unknown-admin";
+  return req.user?.userId ?? "unknown-admin";
 }
 
-// Express types req.params values as string | string[] in this project;
-// route params never actually come back as arrays, so normalize once here
-// rather than casting at every call site.
+
 function paramId(req: Request): string {
   const v = req.params.id;
   return Array.isArray(v) ? v[0] : v;
@@ -119,8 +118,13 @@ router.patch("/:id/status", async (req: Request, res: Response) => {
   }
 });
 
-router.patch("/:id/visibility", async (req: Request, res: Response) => {
+router.patch("/:id/visibility", requireAdmin, async (req: Request, res: Response) => {
   try {
+    if (req.user?.role !== "SUPER_ADMIN" || req.user?.roleType !== "PLATFORM") {
+      res.status(403).json({ error: "Super admin only" });
+      return;
+    }
+
     const id = paramId(req);
     const { admin_override } = req.body as { admin_override?: number };
 

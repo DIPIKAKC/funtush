@@ -7,7 +7,7 @@ import { reindexAgencyPackages } from "./search.service";
 
 export interface AgencyListFilter {
   tier?:       string;  
-  status?:     string;  // AgencyStatus enum value
+  status?:     string;  
   search?:     string;
   joinedFrom?: string;  
   joinedTo?:   string;
@@ -111,12 +111,17 @@ export async function updateAgencyTier(id: string, tierName: string) {
 // Change status
 export async function updateAgencyStatus(
   id: string,
-  status: "ACTIVE" | "SUSPENDED" | "LOCKED"
+  status: "ACTIVE" | "SUSPENDED" | "LOCKED",
+  reason?: string
 ) {
   return prisma.agency.update({
     where: { id },
-    data:  { status },
-    select: { id: true, status: true },
+    data:  {
+      status,
+      statusReason:    reason ?? null,
+      statusUpdatedAt: new Date(),
+    },
+    select: { id: true, status: true, statusReason: true, statusUpdatedAt: true },
   });
 }
 
