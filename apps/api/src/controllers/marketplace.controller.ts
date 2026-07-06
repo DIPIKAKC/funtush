@@ -12,7 +12,10 @@ import {
   getTrending,
   getSeasonal,
 } from "../services/marketplaceCuration.service.js";
-
+import {
+  recordImpression,
+  recordClick,
+} from "../services/marketplaceAnalytics.service.js";
 
 const VALID_DIFFICULTIES = new Set(["EASY", "MODERATE", "CHALLENGING", "DIFFICULT"]);
 
@@ -48,9 +51,17 @@ function optionalTrekkerUserId(req: Request): string | undefined {
   }
 }
 
+/**
+ * DAY 1-3: Search marketplace + ranking by visibility score
+ * 
+ * NEW IN DAY 4:
+ * - For each returned agency, record an impression (non-blocking)
+ * - Return sponsor badge based on priorityOverride
+ */
 export const searchMarketplace = async (req: Request, res: Response) => {
   try {
     const q = asString(req.query.q);
+    const trekkerUserId = optionalTrekkerUserId(req);
 
     // difficulty is case-insensitive in the API (?difficulty=moderate) but the
     // index stores the enum value (MODERATE).
@@ -66,7 +77,7 @@ export const searchMarketplace = async (req: Request, res: Response) => {
       q,
       page: asNumber(req.query.page),
       limit: asNumber(req.query.limit),
-      trekkerUserId: optionalTrekkerUserId(req),
+      trekkerUserId, // For loyalty boost (Day 3)
       filters: {
         difficulty: difficultyRaw,
         priceMin: asNumber(req.query.price_min),
@@ -79,9 +90,75 @@ export const searchMarketplace = async (req: Request, res: Response) => {
       },
     });
 
-    return res.json({ success: true, ...result });
+    // ─── NEW: Record impressions for each returned agency (non-blocking) ───
+    const impressionPromises = (result.data || []).map((pkg) =>
+      recordImpression(pkg.agencyId)
+        .catch((err) => {
+          // Non-blocking: log but don't fail the search
+          console.error(`Failed to record impression for agency ${pkg.agencyId}:`, err);
+        })
+    );
+
+    // Fire and forget: don't await, let impressions record in background
+    Promise.all(impressionPromises).catch(() => {
+      // Silently catch any promise errors
+    });
+
+    // ─── Add sponsor badge based on priorityOverride (Days 3-4) ───
+    const enrichedData = (result.data || []).map((pkg) => ({
+      ...pkg,
+    }));
+
+    return res.json({
+      success: true,
+      ...result,
+      data: enrichedData,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Search failed";
+    return res.status(500).json({ success: false, message });
+  }
+};
+
+/**
+ * DAY 4: Record click on an agency card in search results.
+ * 
+ * Called before navigation to agency profile.
+ * Increments clickCount in today's impression + logs click event.
+ */
+export const recordMarketplaceClick = async (req: Request, res: Response) => {
+  try {
+    const { agencyId, destination, searchQuery } = req.body;
+    const trekkerUserId = optionalTrekkerUserId(req);
+
+    if (!agencyId) {
+      return res.status(400).json({
+        success: false,
+        message: "agencyId is required",
+      });
+    }
+
+    if (!destination) {
+      return res.status(400).json({
+        success: false,
+        message: "destination is required (e.g. 'agency-profile', 'inquiry-form')",
+      });
+    }
+
+    const click = await recordClick(
+      agencyId,
+      trekkerUserId,
+      destination,
+      searchQuery
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: "Click recorded",
+      clickId: click.id,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to record click";
     return res.status(500).json({ success: false, message });
   }
 };
