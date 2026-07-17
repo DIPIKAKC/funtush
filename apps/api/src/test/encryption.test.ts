@@ -4,9 +4,8 @@ import { encryptCredentials, decryptCredentials } from '../utils/encryption';
 
 describe('Encryption Utils', () => {
   beforeAll(() => {
-    // Use test key if ENCRYPTION_KEY not set (for CI)
     if (!process.env.ENCRYPTION_KEY) {
-      process.env.ENCRYPTION_KEY = 'a'.repeat(64); // 32 bytes in hex
+      process.env.ENCRYPTION_KEY = 'a'.repeat(64);
     }
   });
 
