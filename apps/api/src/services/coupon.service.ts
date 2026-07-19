@@ -1,4 +1,4 @@
-import { CouponStatus, db, DiscountType } from "@funtush/database";
+import { BookingStatus, CouponStatus, db, DiscountType } from "@funtush/database";
 
 interface CouponPayload {
     code: string;
@@ -13,6 +13,33 @@ interface CouponPayload {
     minGroupSize?: number;
     status?: CouponStatus;
 }
+
+// interface ApplyCouponPayload {
+//   agencyId: string;
+//   couponCode: string;
+//   packageId: string;
+//   bookingValue: number;
+//   groupSize: number;
+//   trekkerEmail: string;
+// }
+
+// interface CouponApplicationResult {
+//   couponId: string;
+//   couponCode: string;
+//   discount: number;
+//   originalAmount: number;
+//   finalAmount: number;
+// }
+
+interface applyCoupon {
+    agencyId: string;
+    couponCode: string;
+    packageId: string;
+    bookingValue: number;
+    groupSize: number;
+    trekkerEmail: string;
+}
+
 export const createCouponService = async (
     agencyId: string,
     data: CouponPayload
@@ -285,4 +312,156 @@ export const getAgencyCouponsService = async (
         createdAt: coupon.createdAt,
         updatedAt: coupon.updatedAt,
     }));
+};
+
+
+//   let totalPriceAfterDiscount = totalPrice;
+//   let couponId: string | undefined;
+
+//   if (code) {
+//     const coupon = await validateAndApplyCoupon({
+//       agencyId: pkg.agencyId,
+//       couponCode: code,
+//       packageId,
+//       bookingValue: totalPrice,
+//       groupSize,
+//       trekkerEmail,
+//     });
+
+//     totalPriceAfterDiscount = coupon.finalAmount;
+//     couponId = coupon.couponId;
+//   }
+export const validateAndApplyCoupon = async (
+    data: applyCoupon
+) => {
+
+    // const couponCode = await db.coupon.findFirst({
+    //     where: {
+    //         code: data.couponCode
+    //     },
+    //     select: {
+    //         id: true,
+    //         agencyId: true,
+    //         code: true*
+    //     }
+    // })
+
+    const code = data.couponCode.trim().toUpperCase();
+    const agencyId = data?.agencyId;
+
+    const coupon = await db.coupon.findUnique({
+        where: {
+            agencyId_code: {
+                agencyId,
+                code,
+            },
+        },
+    });
+
+    if (!coupon) {
+        throw new Error("Coupon not found.");
+    }
+
+    // Active
+
+    if (coupon.status !== CouponStatus.ACTIVE) {
+        throw new Error("Coupon is inactive.");
+    }
+
+    // Date validation
+
+    const now = new Date();
+
+    if (now < coupon.validFrom) {
+        throw new Error("Coupon is not active yet.");
+    }
+
+    if (now > coupon.validUntil) {
+        throw new Error("Coupon has expired.");
+    }
+
+    // Usage limit
+
+    if (
+        coupon.maxRedemptions > 0 &&
+        coupon.redemptionsUsed >= coupon.maxRedemptions
+    ) {
+        throw new Error("Coupon usage limit reached.");
+    }
+
+    // Minimum booking amount
+
+    if (
+        coupon.minBookingValue &&
+        data.bookingValue < coupon.minBookingValue
+    ) {
+        throw new Error(
+            `Minimum booking value is Rs.${coupon.minBookingValue}.`
+        );
+    }
+
+    // Minimum group size
+
+    if (
+        coupon.minGroupSize &&
+        data.groupSize < coupon.minGroupSize
+    ) {
+        throw new Error(
+            `Minimum group size is ${coupon.minGroupSize}.`
+        );
+    }
+
+    // Package validation
+
+    if (
+        coupon.applicablePackages.length > 0 &&
+        !coupon.applicablePackages.includes(data.packageId)
+    ) {
+        throw new Error(
+            "Coupon is not applicable for this package."
+        );
+    }
+
+    // First-time trekker
+
+    if (coupon.firstTimeTrekkerOnly) {
+        const previousBooking = await db.booking.findFirst({
+            where: {
+                trekkerEmail: data.trekkerEmail,
+                status:{
+                    not: BookingStatus.REJECTED,
+                }
+            },
+        });
+
+        if (previousBooking) {
+            throw new Error(
+                "Coupon is only valid for first-time trekkers."
+            );
+        }
+    }
+
+    // Discount calculation
+
+    let discount = 0;
+
+    if (coupon.discountType === DiscountType.PERCENTAGE) {
+        discount =
+            (data.bookingValue * coupon.discountValue) / 100;
+    } else {
+        discount = coupon.discountValue;
+    }
+
+    // Never discount more than booking value
+    discount = Math.min(discount, data.bookingValue);
+
+    const finalAmount = data.bookingValue - discount;
+
+    return {
+        couponId: coupon.id,
+        couponCode: coupon.code,
+        discount,
+        originalAmount: data.bookingValue,
+        finalAmount,
+    };
 };
