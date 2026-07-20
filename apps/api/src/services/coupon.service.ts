@@ -1,6 +1,6 @@
 import { BookingStatus, CouponStatus, db, DiscountType } from "@funtush/database";
 
-interface CouponPayload {
+interface CreateCouponPayload {
     code: string;
     discountType: DiscountType;
     discountValue: number;
@@ -14,22 +14,20 @@ interface CouponPayload {
     status?: CouponStatus;
 }
 
-// interface ApplyCouponPayload {
-//   agencyId: string;
-//   couponCode: string;
-//   packageId: string;
-//   bookingValue: number;
-//   groupSize: number;
-//   trekkerEmail: string;
-// }
+interface UpdateCouponPayload {
+    code?: string;
+    discountType?: DiscountType;
+    discountValue?: number;
+    applicablePackages?: string[];
+    minBookingValue?: number;
+    validFrom?: string;
+    validUntil?: string;
+    maxRedemptions?: number;
+    firstTimeTrekkerOnly?: boolean;
+    minGroupSize?: number;
+    status?: CouponStatus;
+}
 
-// interface CouponApplicationResult {
-//   couponId: string;
-//   couponCode: string;
-//   discount: number;
-//   originalAmount: number;
-//   finalAmount: number;
-// }
 
 interface applyCoupon {
     agencyId: string;
@@ -42,7 +40,7 @@ interface applyCoupon {
 
 export const createCouponService = async (
     agencyId: string,
-    data: CouponPayload
+    data: CreateCouponPayload
 ) => {
 
     // Code should not be empty
@@ -146,7 +144,7 @@ export const createCouponService = async (
 export const updateCouponService = async (
     agencyId: string,
     couponId: string,
-    data: CouponPayload
+    data: UpdateCouponPayload
 ) => {
     const coupon = await db.coupon.findFirst({
         where: {
