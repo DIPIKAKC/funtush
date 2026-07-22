@@ -155,6 +155,7 @@ model Agency {
   marketplaceImpressions MarketplaceImpression[]
   marketplaceClicks      MarketplaceClick[]
   coupons                Coupon[]
+  branches               Branch[]
 
   paymentMethods AgencyPaymentMethod[]
   accounts       Account[]
