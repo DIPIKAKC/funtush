@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createCoupon, getAgencyCoupons, updateCoupon } from "src/controllers/coupon.controller";
+import { applyCoupon, createCoupon, getAgencyCoupons, updateCoupon } from "src/controllers/coupon.controller";
 import { authenticateWithRefreshToken } from "src/middleware/refreshTokenAuthentication";
 const router = Router();
 
@@ -9,5 +9,8 @@ router.route('/agencies/me/coupons')
 
 router.route('/agencies/me/coupons/:id')
     .patch(updateCoupon);
+
+router.route('bookings/inquiry/apply-coupon')
+    .patch(applyCoupon);
 
 export default router;

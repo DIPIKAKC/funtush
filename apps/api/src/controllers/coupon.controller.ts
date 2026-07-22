@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { createCouponService, getAgencyCouponsService, updateCouponService } from "src/services/coupon.service";
+import { createCouponService, getAgencyCouponsService, updateCouponService, validateAndApplyCoupon } from "src/services/coupon.service";
 
 export const createCoupon = async (
     req: Request,
@@ -74,6 +74,41 @@ export const getAgencyCoupons = async (
             count: coupons.length,
             data: coupons,
         });
+    } catch (err) {
+        return res.status(400).json({
+            success: false,
+            message:
+                err instanceof Error
+                    ? err.message
+                    : "Something went wrong",
+        });
+    }
+};
+
+export const applyCoupon = async (
+    req: Request,
+    res: Response
+) => {
+    try {
+
+        // const {
+        //     agencyId,
+        //     couponCode,
+        //     packageId,
+        //     bookingValue,
+        //     groupSize,
+        //     trekkerEmail,
+        // } = req.body;
+
+        const coupon = await validateAndApplyCoupon(
+            req.body
+        );
+
+        return res.status(201).json({
+            success: true,
+            data: coupon,
+        });
+
     } catch (err) {
         return res.status(400).json({
             success: false,
