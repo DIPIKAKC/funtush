@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { createBranchService, getBranchesService, updateBranchService } from "src/services/branches.service";
+import { assignGuideToBranchService, assignPackageToBranchService, assignStaffToBranchService, createBranchService, getBranchesService, getBranchReportService, getConsolidatedFinanceService, updateBranchService } from "src/services/branches.service";
 
 export const createBranch = async (
     req: Request,
@@ -85,3 +85,145 @@ export const getAgencyBranches = async (
     }
 };
 
+
+export const assignStaffToBranch = async (
+    req: Request,
+    res: Response
+) => {
+    try {
+        const agencyUserId = req.tenantId as string;
+        const staffId = req.params.id as string;
+
+        const result = await assignStaffToBranchService(
+            agencyUserId,
+            staffId,
+            req.body
+        );
+
+        return res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (err) {
+        return res.status(400).json({
+            success: false,
+            message:
+                err instanceof Error
+                    ? err.message
+                    : "Something went wrong",
+        });
+    }
+};
+
+export const assignGuideToBranch = async (
+    req: Request,
+    res: Response
+) => {
+    try {
+        const agencyUserId = req.tenantId as string;
+        const guideId = req.params.id as string;
+
+        const result = await assignGuideToBranchService(
+            agencyUserId,
+            guideId,
+            req.body
+        );
+
+        return res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (err) {
+        return res.status(400).json({
+            success: false,
+            message:
+                err instanceof Error
+                    ? err.message
+                    : "Something went wrong",
+        });
+    }
+};
+
+export const assignPackageBranches = async (
+    req: Request,
+    res: Response
+) => {
+
+    try {
+        const agencyUserId = req.tenantId as string;
+        const packageId = req.params.id as string;
+
+        const result = await assignPackageToBranchService(
+            agencyUserId,
+            packageId,
+            req.body
+        );
+
+        return res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (err) {
+        return res.status(400).json({
+            success: false,
+            message:
+                err instanceof Error
+                    ? err.message
+                    : "Something went wrong",
+        });
+    }
+};
+
+export const getBranchReportController = async (
+    req: Request,
+    res: Response
+) => {
+    try {
+        const agencyUserId = req.tenantId as string;
+        const branchId = req.params.id as string;
+
+        const result = await getBranchReportService(
+            agencyUserId,
+            branchId
+        );
+
+        return res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (err) {
+        return res.status(400).json({
+            success: false,
+            message:
+                err instanceof Error
+                    ? err.message
+                    : "Something went wrong",
+        });
+    }
+};
+
+export const getConsolidatedFinanceController = async (
+    req: Request,
+    res: Response
+) => {
+    try {
+        const agencyUserId = req.tenantId as string;
+
+        const result = await getConsolidatedFinanceService(
+            agencyUserId
+        );
+
+        return res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (err) {
+        return res.status(400).json({
+            success: false,
+            message:
+                err instanceof Error
+                    ? err.message
+                    : "Something went wrong",
+        });
+    }
+};

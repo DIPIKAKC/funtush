@@ -1,5 +1,6 @@
 import { db } from '@funtush/database';
 import { generateKhaltiPayload, verifyKhaltiPayment } from '../utils/khalti';
+import { notificationService } from './notificationService';
 
 export async function initiateKhaltiPayment(
   agencyId: string,
@@ -55,11 +56,23 @@ export async function verifyAndCompleteKhaltiPayment(
       where: { id: transactionId },
       data: { status: 'failed' },
     });
+    
+    const agency = await db.agency.findUnique({ where: { id: agencyId } });
+    if (agency) {
+      try {
+        await notificationService.sendEmailNotification(agency.email, 'subscription_payment_failed', {
+          agencyName: agency.name,
+          provider: 'Khalti',
+        });
+      } catch (err) {
+        console.error('[Notification] Khalti failure notify error:', err);
+      }
+    }
     throw new Error('Khalti payment verification failed');
   }
 
-  // Update transaction
-  await db.khaltiTransaction.update({
+  // Update transaction — capture the result
+  const updatedTransaction = await db.khaltiTransaction.update({
     where: { id: transactionId },
     data: {
       status: 'success',
@@ -68,7 +81,6 @@ export async function verifyAndCompleteKhaltiPayment(
     },
   });
 
-  // Create/update subscription
   const agency = await db.agency.findUnique({
     where: { id: agencyId },
   });
@@ -77,11 +89,21 @@ export async function verifyAndCompleteKhaltiPayment(
     throw new Error('Agency not found');
   }
 
-  // Update agency tier
   await db.agency.update({
     where: { id: agencyId },
     data: { tierId: transaction.tierId },
   });
 
-  return transaction;
+  try {
+    await notificationService.sendEmailNotification(agency.email, 'subscription_payment_received', {
+      agencyName: agency.name,
+      amount: transaction.amount,
+      currency: 'NPR',
+      provider: 'Khalti',
+    });
+  } catch (err) {
+    console.error('[Notification] Khalti success notify error:', err);
+  }
+
+  return updatedTransaction; 
 }

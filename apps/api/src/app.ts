@@ -11,6 +11,7 @@ import { startSubscriptionCron } from "./jobs/subscriptionExpiry.job";
 import reportsRouter from "./routes/agency/reports.route";
 import billingRoutes from './routes/billing.routes';
 import stripeWebhookRoutes from './routes/webhooks/stripe';
+import paymentMethodsRoutes from "./routes/paymentMethods";
 
 const app = express();  
 
@@ -43,7 +44,7 @@ app.use("/agencies/me/reports", reportsRouter);
 app.use("/", agencyRoutes);
 app.use("/bookings", bookingRoutes);
 app.use("/webhooks/payment", paymentWebhookRoutes);
-
+app.use("/agencies/me/payment-methods", paymentMethodsRoutes);
 
 app.use('/billing', billingRoutes);
 app.use('/webhooks', stripeWebhookRoutes);
