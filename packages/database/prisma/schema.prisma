@@ -401,8 +401,7 @@ model AgencyStaff {
   role            Role?      @relation(fields: [roleId], references: [id])
   agency          Agency     @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   managedBranches Branch[]   @relation("BranchManager")
-
-  @@unique([agencyId, userId])
+  payrolls        Payroll[]
 
   @@unique([agencyId, userId])
   @@index([agencyId])

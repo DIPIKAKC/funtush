@@ -73,18 +73,18 @@ export const createBranchService = async (
     }
 
 
-    // if (data.managerStaffId) {
-    //     const manager = await db.agencyStaff.findFirst({
-    //         where: {
-    //             id: data.managerStaffId,
-    //             agencyId: agency.id,
-    //             isActive: true
-    //         }
-    //     });
+    if (data.managerStaffId) {
+        const manager = await db.agencyStaff.findFirst({
+            where: {
+                id: data.managerStaffId,
+                agencyId: agency.id,
+                isActive: true
+            }
+        });
 
-    //     if (!manager)
-    //         throw new Error("Manager does not belong to your agency.");
-    // }
+        if (!manager)
+            throw new Error("Manager does not belong to your agency.");
+    }
 
     if (data.isHeadOffice === true) {
         const existing = await db.branch.findFirst({
@@ -105,7 +105,7 @@ export const createBranchService = async (
             address: data.address,
             phone: data.phone,
             whatsapp: data.whatsapp,
-            // managerStaffId: data.managerStaffId,
+            managerStaffId: data.managerStaffId,
             isHeadOffice: data.isHeadOffice ?? false
         }
     });
@@ -139,18 +139,18 @@ export const updateBranchService = async (
     if (!branch)
         throw new Error("Branch not found");
 
-    // if (data.managerStaffId) {
-    //     const manager = await db.agencyStaff.findFirst({
-    //         where: {
-    //             id: data.managerStaffId,
-    //             agencyId: agencyUser.agencyId,
-    //             isActive: true
-    //         }
-    //     });
+    if (data.managerStaffId) {
+        const manager = await db.agencyStaff.findFirst({
+            where: {
+                id: data.managerStaffId,
+                agencyId: agencyUser.agencyId,
+                isActive: true
+            }
+        });
 
-    //     if (!manager)
-    //         throw new Error("Invalid manager");
-    // }
+        if (!manager)
+            throw new Error("Invalid manager");
+    }
 
     if (data.isHeadOffice === true) {
         const existing = await db.branch.findFirst({
@@ -203,7 +203,7 @@ export const getBranchesService = async (
             address: true,
             phone: true,
             whatsapp: true,
-            is_head_office: true,
+            isHeadOffice: true,
             managerStaff: {
                 select: {
                     id: true,
@@ -314,18 +314,7 @@ export const assignGuideToBranchService = async (
     if (!agencyUser)
         throw new Error("Agency user not found");
 
-    // const guide = await db.guide.findFirst({
-    //     where: {
-    //         id: guideId,
-    //         agencyId: agencyUser.agencyId
-    //     }
-    // });
-
-    // if (!guide)
-    //     throw new Error("Guide not found");
-
     if (data.branchId) {
-
         const branch = await db.branch.findFirst({
             where: {
                 id: data.branchId,
@@ -337,24 +326,9 @@ export const assignGuideToBranchService = async (
             throw new Error("Branch not found");
     }
 
-    // const updatedGuide = await db.guide.update({
-    //     where: {
-    //         id: guide.id
-    //     },
-    //     data: {
-    //         branchId: data.branchId
-    //     },
-    //     include: {
-    //         branch: {
-    //             select: {
-    //                 id: true,
-    //                 name: true
-    //             }
-    //         }
-    //     }
-    // });
-
-    // return updatedGuide;
+    throw new Error(
+        "Guide assignment is not implemented. The current schema does not contain a Guide model."
+    );
 }
 
 export const assignPackageToBranchService = async (
