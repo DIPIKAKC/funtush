@@ -10,13 +10,6 @@
 ALTER TABLE "bookings" ADD COLUMN     "branch_id" TEXT;
 
 -- AlterTable
-ALTER TABLE "kyc_submissions" ADD COLUMN     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN     "updated_at" TIMESTAMP(3) NOT NULL;
-
--- AlterTable
-ALTER TABLE "stripe_subscriptions" ADD COLUMN     "current_period_start" TIMESTAMP(3) NOT NULL;
-
--- AlterTable
 ALTER TABLE "trek_packages" ADD COLUMN     "availableToAllBranches" BOOLEAN NOT NULL DEFAULT true;
 
 -- CreateTable
