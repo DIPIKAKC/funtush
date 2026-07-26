@@ -7,9 +7,6 @@
 
 */
 -- AlterTable
-ALTER TABLE "agency_payment_methods" ADD COLUMN     "rotated_at" TIMESTAMP(3);
-
--- AlterTable
 ALTER TABLE "bookings" ADD COLUMN     "branch_id" TEXT;
 
 -- AlterTable
@@ -29,9 +26,6 @@ CREATE TABLE "PackageBranch" (
 
     CONSTRAINT "PackageBranch_pkey" PRIMARY KEY ("packageId","branchId")
 );
-
--- CreateIndex
-CREATE INDEX "agency_payment_methods_provider_idx" ON "agency_payment_methods"("provider");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "branches_name_key" ON "branches"("name");
