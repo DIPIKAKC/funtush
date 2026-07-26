@@ -1,5 +1,6 @@
 import { db } from '@funtush/database';
 import { generateEsewaPayload, verifyEsewaPayment } from '../utils/esewa';
+import { notificationService } from './notificationService';
 
 export async function initiateEsewaPayment(
   agencyId: string,
@@ -49,15 +50,35 @@ export async function verifyAndCompleteEsewaPayment(
 
   const isValid = await verifyEsewaPayment(refId, transaction.amount);
 
+  const agency = await db.agency.findUnique({
+    where: { id: agencyId },
+  });
+
   if (!isValid) {
     await db.esewaTransaction.update({
       where: { id: transactionId },
       data: { status: 'failed' },
     });
+
+    if (agency) {
+      try {
+        await notificationService.sendEmailNotification(
+          agency.email,
+          'subscription_payment_failed',
+          {
+            agencyName: agency.name,
+            provider: 'eSewa',
+          }
+        );
+      } catch (err) {
+        console.error('[Notification] eSewa failure notify error:', err);
+      }
+    }
+
     throw new Error('eSewa payment verification failed');
   }
 
-  await db.esewaTransaction.update({
+  const updatedTransaction = await db.esewaTransaction.update({
     where: { id: transactionId },
     data: {
       status: 'success',
@@ -66,10 +87,29 @@ export async function verifyAndCompleteEsewaPayment(
     },
   });
 
+  if (!agency) {
+    throw new Error('Agency not found');
+  }
+
   await db.agency.update({
     where: { id: agencyId },
     data: { tierId: transaction.tierId },
   });
 
-  return transaction;
+  try {
+    await notificationService.sendEmailNotification(
+      agency.email,
+      'subscription_payment_received',
+      {
+        agencyName: agency.name,
+        amount: transaction.amount,
+        currency: 'NPR',
+        provider: 'eSewa',
+      }
+    );
+  } catch (err) {
+    console.error('[Notification] eSewa success notify error:', err);
+  }
+
+  return updatedTransaction;
 }

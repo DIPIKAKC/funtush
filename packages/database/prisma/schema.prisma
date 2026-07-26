@@ -106,8 +106,6 @@ enum CouponStatus {
   EXPIRED
 }
 
-// Core: Agency & Users
-
 model SubscriptionTier {
   id           String  @id @default(uuid())
   name         String  @unique
@@ -709,8 +707,6 @@ model ReviewInvitation {
   @@map("review_invitations")
 }
 
-// Accounting: double-entry bookkeeping (Phase 4, Backend Guide §7/§17)
-
 enum AccountType {
   ASSET
   LIABILITY
@@ -766,11 +762,6 @@ model JournalEntry {
   @@map("journal_entries")
 }
 
-// Lines must balance per entry: SUM(debit) = SUM(credit). Enforced at the
-// database level by a deferred constraint trigger (see the migration SQL) —
-// Prisma cannot express triggers, so it lives only in the migration. Lines
-// must therefore always be written inside a transaction together with their
-// entry; a lone unbalanced insert is rejected at COMMIT.
 model JournalLine {
   id             String  @id @default(uuid())
   journalEntryId String  @map("journal_entry_id")

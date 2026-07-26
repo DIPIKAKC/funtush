@@ -7,6 +7,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://test_user:test_password@localhost:5432/funtush_test
+      ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     services:
       postgres:
         image: postgres:15
@@ -25,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4 
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -36,11 +39,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Create database .env
-        working-directory: packages/database
+      - name: Wait for Postgres to be ready
         run: |
-          cat > .env << EOF
-          DATABASE_URL=postgresql://test_user:test_password@localhost:5432/funtush_test          EOF
+          until pg_isready -h localhost -p 5432 -U test_user; do
+            echo "Waiting for postgres..."
+            sleep 2
+          done
+
       - name: Run Prisma migrations
         working-directory: packages/database
         run: pnpm prisma migrate deploy
