@@ -911,6 +911,16 @@ model Branch {
   @@map("branches")
 }
 
+model PackageBranch {
+  packageId String
+  branchId  String
+
+  package TrekPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  branch  Branch      @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([packageId, branchId])
+}
+
 model StripeSubscription {
   id String @id @default(cuid())
 
@@ -1071,12 +1081,4 @@ model TransactionFee {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("transaction_fees")
-model PackageBranch {
-  packageId String
-  branchId  String
-
-  package TrekPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  branch  Branch      @relation(fields: [branchId], references: [id], onDelete: Cascade)
-
-  @@id([packageId, branchId])
 }
