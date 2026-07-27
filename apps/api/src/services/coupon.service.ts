@@ -28,7 +28,6 @@ interface UpdateCouponPayload {
     status?: CouponStatus;
 }
 
-
 interface applyCoupon {
     agencyId: string;
     couponCode: string;
@@ -37,6 +36,7 @@ interface applyCoupon {
     groupSize: number;
     trekkerEmail: string;
 }
+
 
 export const createCouponService = async (
     agencyId: string,
@@ -139,7 +139,6 @@ export const createCouponService = async (
 
     return coupon;
 };
-
 
 export const updateCouponService = async (
     agencyId: string,
@@ -263,14 +262,12 @@ export const updateCouponService = async (
             code,
             discountType: data.discountType,
             discountValue: data.discountValue,
-            applicablePackages:
-                data.applicablePackages,
+            applicablePackages: data.applicablePackages,
             minBookingValue: data.minBookingValue,
             validFrom,
             validUntil,
             maxRedemptions: data.maxRedemptions,
-            firstTimeTrekkerOnly:
-                data.firstTimeTrekkerOnly,
+            firstTimeTrekkerOnly: data.firstTimeTrekkerOnly,
             minGroupSize: data.minGroupSize,
             status: data.status,
         },
@@ -300,10 +297,8 @@ export const getAgencyCouponsService = async (
         validUntil: coupon.validUntil,
         maxRedemptions: coupon.maxRedemptions,
         redemptionsUsed: coupon.redemptionsUsed,
-        remainingRedemptions:
-            coupon.maxRedemptions - coupon.redemptionsUsed,
-        firstTimeTrekkerOnly:
-            coupon.firstTimeTrekkerOnly,
+        remainingRedemptions: coupon.maxRedemptions - coupon.redemptionsUsed,
+        firstTimeTrekkerOnly: coupon.firstTimeTrekkerOnly,
         minGroupSize: coupon.minGroupSize,
         status: coupon.status,
         isExpired: coupon.validUntil < new Date(),
@@ -312,37 +307,9 @@ export const getAgencyCouponsService = async (
     }));
 };
 
-
-//   let totalPriceAfterDiscount = totalPrice;
-//   let couponId: string | undefined;
-
-//   if (code) {
-//     const coupon = await validateAndApplyCoupon({
-//       agencyId: pkg.agencyId,
-//       couponCode: code,
-//       packageId,
-//       bookingValue: totalPrice,
-//       groupSize,
-//       trekkerEmail,
-//     });
-
-//     totalPriceAfterDiscount = coupon.finalAmount;
-//     couponId = coupon.couponId;
-//   }
 export const validateAndApplyCoupon = async (
     data: applyCoupon
 ) => {
-
-    // const couponCode = await db.coupon.findFirst({
-    //     where: {
-    //         code: data.couponCode
-    //     },
-    //     select: {
-    //         id: true,
-    //         agencyId: true,
-    //         code: true*
-    //     }
-    // })
 
     const code = data.couponCode.trim().toUpperCase();
     const agencyId = data?.agencyId;
@@ -361,13 +328,11 @@ export const validateAndApplyCoupon = async (
     }
 
     // Active
-
     if (coupon.status !== CouponStatus.ACTIVE) {
         throw new Error("Coupon is inactive.");
     }
 
     // Date validation
-
     const now = new Date();
 
     if (now < coupon.validFrom) {
@@ -379,7 +344,6 @@ export const validateAndApplyCoupon = async (
     }
 
     // Usage limit
-
     if (
         coupon.maxRedemptions > 0 &&
         coupon.redemptionsUsed >= coupon.maxRedemptions
@@ -388,7 +352,6 @@ export const validateAndApplyCoupon = async (
     }
 
     // Minimum booking amount
-
     if (
         coupon.minBookingValue &&
         data.bookingValue < coupon.minBookingValue
@@ -399,7 +362,6 @@ export const validateAndApplyCoupon = async (
     }
 
     // Minimum group size
-
     if (
         coupon.minGroupSize &&
         data.groupSize < coupon.minGroupSize
@@ -410,7 +372,6 @@ export const validateAndApplyCoupon = async (
     }
 
     // Package validation
-
     if (
         coupon.applicablePackages.length > 0 &&
         !coupon.applicablePackages.includes(data.packageId)
@@ -421,7 +382,6 @@ export const validateAndApplyCoupon = async (
     }
 
     // First-time trekker
-
     if (coupon.firstTimeTrekkerOnly) {
         const previousBooking = await db.booking.findFirst({
             where: {
@@ -440,7 +400,6 @@ export const validateAndApplyCoupon = async (
     }
 
     // Discount calculation
-
     let discount = 0;
 
     if (coupon.discountType === DiscountType.PERCENTAGE) {

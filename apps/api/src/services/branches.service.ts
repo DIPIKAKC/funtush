@@ -5,7 +5,6 @@ interface CreateBranchPayload {
     address: string;
     phone: string;
     whatsapp?: string;
-    managerStaffId?: string;
     isHeadOffice?: boolean;
 }
 
@@ -72,20 +71,6 @@ export const createBranchService = async (
         );
     }
 
-
-    // if (data.managerStaffId) {
-    //     const manager = await db.agencyStaff.findFirst({
-    //         where: {
-    //             id: data.managerStaffId,
-    //             agencyId: agency.id,
-    //             isActive: true
-    //         }
-    //     });
-
-    //     if (!manager)
-    //         throw new Error("Manager does not belong to your agency.");
-    // }
-
     if (data.isHeadOffice === true) {
         const existing = await db.branch.findFirst({
             where: {
@@ -105,7 +90,6 @@ export const createBranchService = async (
             address: data.address,
             phone: data.phone,
             whatsapp: data.whatsapp,
-            // managerStaffId: data.managerStaffId,
             isHeadOffice: data.isHeadOffice ?? false
         }
     });
@@ -139,18 +123,18 @@ export const updateBranchService = async (
     if (!branch)
         throw new Error("Branch not found");
 
-    // if (data.managerStaffId) {
-    //     const manager = await db.agencyStaff.findFirst({
-    //         where: {
-    //             id: data.managerStaffId,
-    //             agencyId: agencyUser.agencyId,
-    //             isActive: true
-    //         }
-    //     });
+    if (data.managerStaffId) {
+        const manager = await db.agencyStaff.findFirst({
+            where: {
+                id: data.managerStaffId,
+                agencyId: agencyUser.agencyId,
+                isActive: true
+            }
+        });
 
-    //     if (!manager)
-    //         throw new Error("Invalid manager");
-    // }
+        if (!manager)
+            throw new Error("Invalid manager");
+    }
 
     if (data.isHeadOffice === true) {
         const existing = await db.branch.findFirst({
@@ -325,7 +309,6 @@ export const assignGuideToBranchService = async (
     //     throw new Error("Guide not found");
 
     if (data.branchId) {
-
         const branch = await db.branch.findFirst({
             where: {
                 id: data.branchId,
@@ -386,7 +369,6 @@ export const assignPackageToBranchService = async (
         throw new Error("Package not found");
 
     if (data.shareAcrossAll) {
-
         await db.trekPackage.update({
             where: {
                 id: packageItem.id
@@ -400,7 +382,6 @@ export const assignPackageToBranchService = async (
         });
 
     } else {
-
         if (!data.branchIds?.length)
             throw new Error("Please select at least one branch");
 

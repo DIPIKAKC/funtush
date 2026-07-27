@@ -90,16 +90,7 @@ export const applyCoupon = async (
     res: Response
 ) => {
     try {
-
-        // const {
-        //     agencyId,
-        //     couponCode,
-        //     packageId,
-        //     bookingValue,
-        //     groupSize,
-        //     trekkerEmail,
-        // } = req.body;
-
+        
         const coupon = await validateAndApplyCoupon(
             req.body
         );
