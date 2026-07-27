@@ -10,6 +10,7 @@ import bookingRoutes from "./routes/booking.routes.js";
 import agencyCustomerRoutes from "./routes/agencyCustomer.routes.js";
 import trekkerRoutes from "./routes/trekker.routes.js";
 import marketplaceRoutes from "./routes/marketplace.routes.js";
+import mobileRoutes from "./routes/mobile.routes.js";
 import reviewRoutes from "./routes/review.route.js";
 import couponRoutes from "./routes/coupon.route.js";
 import financeRoutes from "./routes/finance.route.js";
@@ -44,6 +45,8 @@ app.use("/", agencyCustomerRoutes);
 app.use("/", trekkerRoutes);
 app.use("/", packageRoutes);
 app.use("/marketplace", marketplaceRoutes);
+// Mobile-optimized dashboards for the React Native app (slim, paginated).
+app.use("/mobile", mobileRoutes);
 app.use("/bookings", bookingRoutes);
 app.use("/auth", authRoutes);
 app.use("/agencies/me/staff", staffRoutes);
