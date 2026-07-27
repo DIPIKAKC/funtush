@@ -1,5 +1,3 @@
-import type { TrekPackage } from '@funtush/database';
-
 export interface CreativeData {
   agencyLogo?: string | null; 
   agencyName: string;

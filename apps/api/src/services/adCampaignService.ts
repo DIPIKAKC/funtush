@@ -1,5 +1,5 @@
 import { db } from '@funtush/database';
-import { generateCreativeVariations, type AdCreative } from '../utils/creativeGenerator';
+import { generateCreativeVariations } from '../utils/creativeGenerator';
 
 export async function generateAdCampaign(agencyId: string) {
   // Get agency profile
