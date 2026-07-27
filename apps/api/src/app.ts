@@ -12,6 +12,7 @@ import reportsRouter from "./routes/agency/reports.route";
 import billingRoutes from './routes/billing.routes';
 import stripeWebhookRoutes from './routes/webhooks/stripe';
 import paymentMethodsRoutes from "./routes/paymentMethods";
+import adCampaignRoutes from "./routes/adCampaign.routes";
 
 const app = express();  
 
@@ -48,6 +49,7 @@ app.use("/agencies/me/payment-methods", paymentMethodsRoutes);
 
 app.use('/billing', billingRoutes);
 app.use('/webhooks', stripeWebhookRoutes);
+app.use('/agencies/me/ad-campaigns', adCampaignRoutes);
 
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   startSubscriptionCron();
