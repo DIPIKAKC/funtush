@@ -194,23 +194,422 @@ export const getBranchesService = async (
         throw new Error("Agency user not found");
 
     return await db.branch.findMany({
-
         where: {
             agencyId: agencyUser.agencyId
         },
-
-        include: {
+        select: {
+            id: true,
+            name: true,
+            address: true,
+            phone: true,
+            whatsapp: true,
+            isHeadOffice: true,
             managerStaff: {
                 select: {
                     id: true,
                     fullName: true,
                     email: true
                 }
-            }
+            },
         },
-
         orderBy: {
             createdAt: "asc"
         }
     });
 }
+
+interface assignstaffpayload {
+    branchId: string
+}
+interface assignguidepayload {
+    branchId: string
+}
+interface assignpackagepayload {
+    branchIds: string[]
+    shareAcrossAll: boolean
+}
+
+export const assignStaffToBranchService = async (
+    agencyUserId: string,
+    staffId: string,
+    data: assignstaffpayload
+) => {
+
+    const agencyUser = await db.agencyUser.findUnique({
+        where: {
+            id: agencyUserId
+        },
+        select: {
+            agencyId: true
+        }
+    });
+
+    if (!agencyUser)
+        throw new Error("Agency user not found");
+
+    const staff = await db.agencyStaff.findFirst({
+        where: {
+            id: staffId,
+            agencyId: agencyUser.agencyId
+        }
+    });
+
+    if (!staff) {
+        throw new Error("Staff not found");
+    }
+
+    if (data.branchId) {
+        const branch = await db.branch.findFirst({
+            where: {
+                id: data.branchId,
+                agencyId: agencyUser.agencyId
+            }
+        });
+
+        if (!branch) {
+            throw new Error("Branch not found");
+        }
+    }
+
+    const updatedStaff = await db.agencyStaff.update({
+        where: {
+            id: staff.id
+        },
+        data: {
+            managedBranches: {
+                connect: [
+                    { id: data.branchId }
+                ]
+            }
+        },
+        include: {
+            managedBranches: {
+                select: {
+                    id: true,
+                    name: true
+                }
+            }
+        }
+    });
+
+    return updatedStaff;
+
+}
+
+export const assignGuideToBranchService = async (
+    agencyUserId: string,
+    guideId: string,
+    data: assignguidepayload
+) => {
+
+    const agencyUser = await db.agencyUser.findUnique({
+        where: {
+            id: agencyUserId
+        },
+        select: {
+            agencyId: true
+        }
+    });
+
+    if (!agencyUser)
+        throw new Error("Agency user not found");
+
+    if (data.branchId) {
+        const branch = await db.branch.findFirst({
+            where: {
+                id: data.branchId,
+                agencyId: agencyUser.agencyId
+            }
+        });
+
+        if (!branch)
+            throw new Error("Branch not found");
+    }
+
+    throw new Error(
+        "Guide assignment is not implemented. The current schema does not contain a Guide model."
+    );
+}
+
+export const assignPackageToBranchService = async (
+    agencyUserId: string,
+    packageId: string,
+    data: assignpackagepayload
+) => {
+
+    const agencyUser = await db.agencyUser.findUnique({
+        where: {
+            id: agencyUserId
+        },
+        select: {
+            agencyId: true
+        }
+    });
+
+    if (!agencyUser)
+        throw new Error("Agency user not found");
+
+    const packageItem = await db.trekPackage.findFirst({
+        where: {
+            id: packageId,
+            agencyId: agencyUser.agencyId
+        }
+    });
+
+    if (!packageItem)
+        throw new Error("Package not found");
+
+    if (data.shareAcrossAll) {
+
+        await db.trekPackage.update({
+            where: {
+                id: packageItem.id
+            },
+            data: {
+                availableToAllBranches: true,
+                packageBranches: {
+                    deleteMany: {}
+                }
+            }
+        });
+
+    } else {
+
+        if (!data.branchIds?.length)
+            throw new Error("Please select at least one branch");
+
+        const branches = await db.branch.findMany({
+            where: {
+                agencyId: agencyUser.agencyId,
+                id: {
+                    in: data.branchIds
+                }
+            }
+        });
+
+        if (branches.length !== data.branchIds.length)
+            throw new Error("Invalid branch selected");
+
+        await db.trekPackage.update({
+            where: {
+                id: packageItem.id
+            },
+            data: {
+                availableToAllBranches: false,
+
+                packageBranches: {
+                    deleteMany: {},
+
+                    create: data.branchIds.map(branchId => ({
+                        branch: {
+                            connect: {
+                                id: branchId
+                            }
+                        }
+                    }))
+                }
+            }
+        });
+    }
+
+    return db.trekPackage.findUnique({
+        where: {
+            id: packageItem.id
+        },
+        include: {
+            packageBranches: {
+                include: {
+                    branch: {
+                        select: {
+                            id: true,
+                            name: true
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+export const getBranchReportService = async (
+    agencyUserId: string,
+    branchId: string
+) => {
+
+    const agencyUser = await db.agencyUser.findUnique({
+        where: {
+            id: agencyUserId
+        },
+        select: {
+            agencyId: true
+        }
+    });
+
+    if (!agencyUser)
+        throw new Error("Agency user not found");
+
+    const branch = await db.branch.findFirst({
+        where: {
+            id: branchId,
+            agencyId: agencyUser.agencyId
+        },
+        select: {
+            id: true,
+            name: true
+        }
+    });
+
+    if (!branch)
+        throw new Error("Branch not found");
+
+    const totalBookings = await db.booking.count({
+        where: {
+            branchId
+        }
+    });
+
+    const confirmedBookings = await db.booking.count({
+        where: {
+            branchId,
+            status: "CONFIRMED"
+        }
+    });
+
+    const cancelledBookings = await db.booking.count({
+        where: {
+            branchId,
+            status: "CANCELLED"
+        }
+    });
+
+    const inquiryBookings = await db.booking.count({
+        where: {
+            branchId,
+            status: "INQUIRY"
+        }
+    });
+
+    const topPackages = await db.booking.groupBy({
+        by: ["packageId"],
+        where: {
+            branchId,
+            status: "CONFIRMED"
+        },
+        _count: {
+            packageId: true
+        },
+        orderBy: {
+            _count: {
+                packageId: "desc"
+            }
+        }
+    });
+
+    const customers = await db.booking.findMany({
+        where: {
+            branchId
+        },
+        distinct: ["trekkerId"],
+        select: {
+            trekkerId: true
+        }
+    });
+
+    const revenue = await db.booking.aggregate({
+        where: {
+            branchId,
+            status: "CONFIRMED"
+        },
+        _sum: {
+            totalPrice: true
+        },
+        _avg: {
+            totalPrice: true
+        }
+    });
+
+    return {
+        branch,
+        totalBookings,
+        confirmedBookings,
+        cancelledBookings,
+        inquiryBookings,
+        totalRevenue: revenue._sum.totalPrice ?? 0,
+        averageBookingValue: revenue._avg.totalPrice ?? 0,
+        totalCustomers: customers.length,
+        topPackages
+    };
+};
+
+export const getConsolidatedFinanceService = async (
+    agencyUserId: string
+) => {
+
+    const agencyUser = await db.agencyUser.findUnique({
+        where: {
+            id: agencyUserId
+        },
+        select: {
+            agencyId: true
+        }
+    });
+
+    if (!agencyUser)
+        throw new Error("Agency user not found");
+
+    const branches = await db.branch.findMany({
+        where: {
+            agencyId: agencyUser.agencyId
+        },
+        select: {
+            id: true,
+            name: true
+        }
+    });
+
+    const branchReports = await Promise.all(
+        branches.map(async (branch) => {
+
+            const bookings = await db.booking.count({
+                where: {
+                    branchId: branch.id,
+                    status: "CONFIRMED"
+                }
+            });
+
+            const revenue = await db.booking.aggregate({
+                where: {
+                    branchId: branch.id,
+                    status: "CONFIRMED"
+                },
+                _sum: {
+                    totalPrice: true
+                }
+            });
+
+            return {
+                id: branch.id,
+                name: branch.name,
+                bookings,
+                revenue: revenue._sum.totalPrice ?? 0
+            };
+        })
+    );
+
+    const totalBookings = branchReports.reduce(
+        (sum, branch) => sum + branch.bookings,
+        0
+    );
+
+    const totalRevenue = branchReports.reduce(
+        (sum, branch) => sum + Number(branch.revenue),
+        0
+    );
+
+    return {
+        totalBranches: branches.length,
+        totalBookings,
+        totalRevenue,
+        branches: branchReports
+    };
+};

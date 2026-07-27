@@ -1,5 +1,4 @@
 {
-  "$schema": "https://turbo.build/schema.json",
   "ui": "stream",
   "globalDependencies": [".env"],
   "tasks": {
@@ -11,7 +10,9 @@
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
-    "test": {},
+    "test": {
+      "env": ["DATABASE_URL", "ENCRYPTION_KEY"]
+    },
     "clean": {
       "cache": false
     }

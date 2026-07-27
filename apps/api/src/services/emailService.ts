@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 
 interface EmailTemplateData {
-  [key: string]: string | number | boolean | Record<string, unknown>;
+  [key: string]: string | number | boolean | string[] | Record<string, unknown>;
 }
 
 interface EmailOptions {
@@ -499,8 +499,8 @@ class EmailService {
   // ===== TEMPLATE HTML RENDERER =====
 
   private getTemplateHTML(template: string, data: EmailTemplateData): string {
-    const templates: { [key: string]: string } = {
-      'inquiry-received': `
+    const templates: { [key: string]: () => string } = {
+      'inquiry-received': () => `
         <h1>Hi ${data.firstName},</h1>
         <p>Thank you for your interest in <strong>${data.trekName}</strong>!</p>
         <p>We've received your inquiry and our team is reviewing your details.</p>
@@ -511,7 +511,7 @@ class EmailService {
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
         <p><small>Sent via ${this.brandName} Trek Platform</small></p>
       `,
-      'booking-confirmed': `
+      'booking-confirmed': () => `
         <h1>Hi ${data.firstName},</h1>
         <p>Your booking for <strong>${data.trekName}</strong> is confirmed!</p>
         <p><strong>Booking ID:</strong> ${data.bookingId}</p>
@@ -526,7 +526,7 @@ class EmailService {
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
         <p><small>Sent via ${this.brandName} Trek Platform</small></p>
       `,
-      'payment-link': `
+      'payment-link': () => `
         <h1>Hi ${data.firstName},</h1>
         <p>It's time to secure your spot for <strong>${data.trekName}</strong>!</p>
         <p><strong>Amount Due:</strong> ${data.amount}</p>
@@ -537,7 +537,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'trek-reminder': `
+      'trek-reminder': () => `
         <h1>Get Ready, ${data.firstName}!</h1>
         <p>Your <strong>${data.trekName}</strong> adventure starts in 48 hours!</p>
         <p><strong>Date:</strong> ${data.startDate}</p>
@@ -546,13 +546,13 @@ class EmailService {
         <p><strong>Guide Contact:</strong> ${data.guidePhone}</p>
         <h3>Pre-Trek Checklist:</h3>
         <ul>
-          ${data.checklist.map((item: string) => `<li>${item}</li>`).join('')}
+          ${(data.checklist as string[]).map((item: string) => `<li>${item}</li>`).join('')}
         </ul>
         <p>Looking forward to seeing you on the trail!</p>
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'guide-contact': `
+      'guide-contact': () => `
         <h1>Meet Your Guide!</h1>
         <p>We're thrilled to introduce you to <strong>${data.guideName}</strong>, who will be guiding you on the <strong>${data.trekName}</strong> trek.</p>
         <p><strong>Direct Contact:</strong></p>
@@ -562,7 +562,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'review-invitation': `
+      'review-invitation': () => `
         <h1>How Was Your Trek?</h1>
         <p>Congratulations on completing <strong>${data.trekName}</strong> on ${data.completionDate}!</p>
         <p>Your feedback helps us improve our treks and helps other adventurers find the perfect expedition.</p>
@@ -571,7 +571,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'sos-notification': `
+      'sos-notification': () => `
         <h1 style="color: #dc2626;">SOS EMERGENCY ALERT</h1>
         <p><strong>Alert Type:</strong> ${data.sosType}</p>
         <p><strong>Trek:</strong> ${data.trekName}</p>
@@ -584,7 +584,7 @@ class EmailService {
         <hr>
         <p><small>This email contains sensitive information. Do not share publicly.</small></p>
       `,
-      'welcome': `
+      'welcome': () => `
         <h1>Welcome to Funtush, ${data.firstName}!</h1>
         <p>We're thrilled to have you join our community of adventure seekers and experienced guides.</p>
         <p>To get started, please verify your email address by clicking the button below:</p>
@@ -593,7 +593,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'kyc-submitted': `
+      'kyc-submitted': () => `
         <h1>KYC Verification Submitted</h1>
         <p>Hi ${data.firstName},</p>
         <p>We've received your Know Your Customer (KYC) verification documents.</p>
@@ -604,7 +604,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'kyc-approved': `
+      'kyc-approved': () => `
         <h1>KYC Verification Approved</h1>
         <p>Hi ${data.firstName},</p>
         <p><strong style="color: #059669;">Congratulations! Your KYC verification has been approved.</strong></p>
@@ -619,7 +619,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'kyc-rejected': `
+      'kyc-rejected': () => `
         <h1>KYC Verification - Action Required</h1>
         <p>Hi ${data.firstName},</p>
         <p>Unfortunately, your KYC verification could not be approved at this time.</p>
@@ -634,7 +634,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'payment-confirmation': `
+      'payment-confirmation': () => `
         <h1>Payment Confirmed</h1>
         <p>Hi ${data.firstName},</p>
         <p><strong style="color: #059669;">Your payment has been successfully received.</strong></p>
@@ -646,7 +646,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'renewal-reminder': `
+      'renewal-reminder': () => `
         <h1>Subscription Renewal Reminder</h1>
         <p>Hi ${data.firstName},</p>
         <p>Your ${data.subscriptionType} subscription expires in ${data.daysRemaining} days.</p>
@@ -657,7 +657,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'payment-failed': `
+      'payment-failed': () => `
         <h1>Payment Failed - Action Required</h1>
         <p>Hi ${data.firstName},</p>
         <p><strong style="color: #dc2626;">We couldn't process your payment on ${data.attemptDate}.</strong></p>
@@ -668,7 +668,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'breakglass-initiated': `
+      'breakglass-initiated': () => `
         <h1 style="color: #dc2626;">EMERGENCY BREAK-GLASS ACTIVATED</h1>
         <p>An emergency break-glass protocol has been activated.</p>
         <p><strong>Incident Type:</strong> ${data.incidentType}</p>
@@ -678,7 +678,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'breakglass-closed': `
+      'breakglass-closed': () => `
         <h1 style="color: #059669;">Emergency Resolved</h1>
         <p>Hi ${data.firstName},</p>
         <p>The emergency break-glass incident has been resolved.</p>
@@ -688,7 +688,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'bug-status-changed': `
+      'bug-status-changed': () => `
         <h1>Bug Report Status Updated</h1>
         <p>Hi ${data.firstName},</p>
         <p>A bug you reported has been updated.</p>
@@ -700,7 +700,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'ad-campaign-decision': `
+      'ad-campaign-decision': () => `
         <h1>Ad Campaign ${data.status === 'APPROVED' ? 'Approved' : 'Rejected'}</h1>
         <p>Hi ${data.firstName},</p>
         <p>Your ad campaign has been ${data.status === 'APPROVED' ? 'approved and is now live' : 'rejected'}.</p>
@@ -711,7 +711,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'safety-warning': `
+      'safety-warning': () => `
         <h1 style="color: #ef4444;">Safety Warning: ${data.warningType}</h1>
         <p>Hi ${data.firstName},</p>
         <p>We've detected a safety concern that requires your attention.</p>
@@ -722,7 +722,7 @@ class EmailService {
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
-      'trek-start-reminder': `
+      'trek-start-reminder': () => `
         <h1>Trek Starting Tomorrow: ${data.trekName}</h1>
         <p>Hi ${data.firstName},</p>
         <p>Your <strong>${data.trekName}</strong> adventure starts tomorrow!</p>
@@ -732,15 +732,67 @@ class EmailService {
         <p><strong>Guide Contact:</strong> ${data.guidePhone}</p>
         <h3>Pre-Trek Checklist:</h3>
         <ul>
-          ${data.checklist.map((item: string) => `<li>${item}</li>`).join('')}
-        </ul>
+          ${(data.checklist as string[]).map((item: string) => `<li>${item}</li>`).join('')}        </ul>
         <p>Looking forward to seeing you on the trail!</p>
         <hr>
         <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
       `,
+      'payment_failed': () => `
+        <h1>Payment Failed</h1>
+        <p>Hi ${data.agencyName},</p>
+        <p>We were unable to process your recent subscription payment.</p>
+        <p>You have a grace period until <strong>${data.graceUntil}</strong> to update your payment method and retry the charge before your subscription is affected.</p>
+        <a href="${this.brandUrl}" style="background: #dc2626; color: white; padding: 10px 20px; border-radius: 4px; text-decoration: none;">Update Payment Method</a>
+        <hr>
+        <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
+      `,
+      'payment_received': () => `
+      <h1>Payment Received</h1>
+      <p>Hi ${data.agencyName},</p>
+      <p>We've successfully processed your subscription payment.</p>
+      <p><strong>Amount:</strong> ${data.currency} ${data.amountPaid}</p>
+      <p><strong>Invoice ID:</strong> ${data.invoiceId}</p>
+      <p>Your subscription is active through <strong>${data.periodEnd}</strong>.</p>
+      <hr>
+      <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
+    `,
+        'subscription_payment_received': () => `
+      <h1>Payment Received</h1>
+      <p>Hi ${data.agencyName},</p>
+      <p>We've successfully processed your subscription payment via <strong>${data.provider}</strong>.</p>
+      <p><strong>Amount:</strong> ${data.currency} ${data.amount}</p>
+      <hr>
+      <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
+    `,
+          'subscription_payment_failed': () => `
+      <h1>Payment Verification Failed</h1>
+      <p>Hi ${data.agencyName},</p>
+      <p>We couldn't verify your subscription payment via <strong>${data.provider}</strong>. Please try again or contact support.</p>
+      <hr>
+      <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
+    `,
+            'trekker_payment_confirmed': () => `
+      <h1>Payment Confirmed</h1>
+      <p>Hi there,</p>
+      <p>Your payment of <strong>NPR ${data.amount}</strong> to <strong>${data.agencyName}</strong> has been received via Fonepay.</p>
+      <p><strong>Transaction ID:</strong> ${data.transactionId}</p>
+      <p><strong>Booking ID:</strong> ${data.bookingId}</p>
+      <hr>
+      <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
+    `,
+              'trekker_payment_failed': () => `
+      <h1>Payment Verification Failed</h1>
+      <p>Hi there,</p>
+      <p>We couldn't verify your Fonepay payment of <strong>NPR ${data.amount}</strong> to <strong>${data.agencyName}</strong>.</p>
+      <p><strong>Transaction ID:</strong> ${data.transactionId}</p>
+      <p>Please try again or contact the agency directly.</p>
+      <hr>
+      <p><small>© 2024 ${this.brandName}. All rights reserved.</small></p>
+    `,
     };
 
-    return templates[template] || `<p>Unknown template: ${template}</p>`;
+  const build = templates[template];
+    return build ? build() : `<p>Unknown template: ${template}</p>`;
   }
 }
 

@@ -1,6 +1,8 @@
 import { db } from '@funtush/database';
 import { getStripeClient } from '../utils/stripe';
 
+import { notificationService } from './notificationService';
+
 export async function createStripeSubscription(
   agencyId: string,
   email: string,
@@ -41,6 +43,7 @@ export async function createStripeSubscription(
   });
 
   const subscriptionRecord = (subscription as unknown) as Record<string, unknown>;
+  const currentPeriodStart = subscriptionRecord.current_period_start as number;
   const currentPeriodEnd = subscriptionRecord.current_period_end as number;
 
   const stripeSubscription = await db.stripeSubscription.create({
@@ -48,6 +51,7 @@ export async function createStripeSubscription(
       agencyId,
       stripeCustomerId: customer.id,
       stripeSubscriptionId: subscription.id,
+      currentPeriodStart: new Date(currentPeriodStart * 1000),
       currentPeriodEnd: new Date(currentPeriodEnd * 1000),
       status: subscription.status,
     },
@@ -77,8 +81,18 @@ export async function handleInvoicePaid(invoiceId: string, subscriptionId: strin
     throw new Error('Subscription not found');
   }
 
+  // Don't reactivate a subscription that's already been canceled
+  if (stripeSubscription.status === 'canceled') {
+    console.log(
+      `[Stripe] Ignoring invoice.paid for canceled subscription ${subscriptionId}`
+    );
+    return;
+  }
+
   const invoiceRecord = (invoice as unknown) as Record<string, unknown>;
   const periodEnd = invoiceRecord.period_end as number;
+  const amountPaid = invoiceRecord.amount_paid as number;
+  const currency = (invoiceRecord.currency as string) || 'usd';
 
   await db.stripeSubscription.update({
     where: { id: stripeSubscription.id },
@@ -90,6 +104,23 @@ export async function handleInvoicePaid(invoiceId: string, subscriptionId: strin
       currentPeriodEnd: new Date(periodEnd * 1000),
     },
   });
+
+  // Notify agency of successful payment
+  try {
+    await notificationService.sendEmailNotification(
+      stripeSubscription.agency.email,
+      'payment_received',
+      {
+        agencyName: stripeSubscription.agency.name,
+        amountPaid: (amountPaid / 100).toFixed(2),
+        currency: currency.toUpperCase(),
+        periodEnd: new Date(periodEnd * 1000).toISOString(),
+        invoiceId,
+      }
+    );
+  } catch (err) {
+    console.error('[Notification] Failed to notify agency of payment success:', err);
+  }
 
   console.log(`[Stripe] Invoice ${invoiceId} paid for agency ${stripeSubscription.agencyId}`);
 }
@@ -119,6 +150,20 @@ export async function handlePaymentFailed(invoiceId: string, subscriptionId: str
       lastInvoiceStatus: 'failed',
     },
   });
+
+  // Notify agency of payment failure
+  try {
+    await notificationService.sendEmailNotification(
+      stripeSubscription.agency.email,
+      'payment_failed',
+      {
+        agencyName: stripeSubscription.agency.name,
+        graceUntil: graceUntil.toISOString(),
+      }
+    );
+  } catch (err) {
+    console.error('[Notification] Failed to notify agency of payment failure:', err);
+  }
 
   console.log(
     `[Stripe] Payment failed for agency ${stripeSubscription.agencyId}. Grace period until ${graceUntil.toISOString()}`

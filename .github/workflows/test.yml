@@ -22,7 +22,9 @@ jobs:
       postgres:
         image: postgres:15
         env:
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: funtush_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -55,9 +57,15 @@ jobs:
       
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      
+
       - name: Run lint
         run: pnpm run lint
-      
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @funtush/database exec prisma generate
+
+      - name: Run Prisma Migrations
+        run: pnpm --filter @funtush/database exec prisma migrate deploy
+
       - name: Run tests
         run: pnpm run test

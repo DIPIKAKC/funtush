@@ -106,8 +106,6 @@ enum CouponStatus {
   EXPIRED
 }
 
-// Core: Agency & Users
-
 model SubscriptionTier {
   id           String  @id @default(uuid())
   name         String  @unique
@@ -391,19 +389,19 @@ model RolePermission {
 }
 
 model AgencyStaff {
-  id        String     @id @default(uuid())
-  agencyId  String     @map("agency_id")
-  userId    String     @map("user_id")
-  roleId    String?    @map("role_id")
-  isActive  Boolean    @default(true) @map("is_active")
-  invitedAt DateTime   @default(now()) @map("invited_at")
-  createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
-  user      AgencyUser @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      Role?      @relation(fields: [roleId], references: [id])
-  agency    Agency     @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  branches  Branch[]
-  payrolls  Payroll[]
+  id              String     @id @default(uuid())
+  agencyId        String     @map("agency_id")
+  userId          String     @map("user_id")
+  roleId          String?    @map("role_id")
+  isActive        Boolean    @default(true) @map("is_active")
+  invitedAt       DateTime   @default(now()) @map("invited_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  user            AgencyUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role            Role?      @relation(fields: [roleId], references: [id])
+  agency          Agency     @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  managedBranches Branch[]   @relation("BranchManager")
+  payrolls        Payroll[]
 
   @@unique([agencyId, userId])
   @@index([agencyId])
@@ -425,12 +423,15 @@ model TrekPackage {
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
-  agency         Agency              @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  itineraries    TrekItinerary[]
-  departureDates TrekDepartureDate[]
-  addOns         TrekAddOn[]
-  destinations   TrekDestination[]
-  bookings       Booking[]
+  availableToAllBranches Boolean @default(true)
+
+  agency          Agency              @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  itineraries     TrekItinerary[]
+  departureDates  TrekDepartureDate[]
+  addOns          TrekAddOn[]
+  destinations    TrekDestination[]
+  bookings        Booking[]
+  packageBranches PackageBranch[]
 
   @@index([agencyId])
   @@map("trek_packages")
@@ -498,6 +499,7 @@ model Booking {
   agencyId         String            @map("agency_id")
   trekkerId        String?           @map("trekker_id")
   packageId        String            @map("package_id")
+  branchId         String?           @map("branch_id")
   departureDateId  String            @map("departure_date_id")
   groupSize        Int               @map("group_size")
   totalPrice       Decimal           @map("total_price") @db.Decimal(10, 2)
@@ -515,6 +517,7 @@ model Booking {
   agency           Agency            @relation(fields: [agencyId], references: [id])
   trekker          Trekker?          @relation(fields: [trekkerId], references: [id])
   package          TrekPackage       @relation(fields: [packageId], references: [id])
+  branch           Branch?           @relation(fields: [branchId], references: [id], onDelete: SetNull)
   departureDate    TrekDepartureDate @relation(fields: [departureDateId], references: [id])
   addOns           BookingAddOn[]
   paymentLink      PaymentLink?
@@ -708,8 +711,6 @@ model ReviewInvitation {
   @@map("review_invitations")
 }
 
-// Accounting: double-entry bookkeeping (Phase 4, Backend Guide §7/§17)
-
 enum AccountType {
   ASSET
   LIABILITY
@@ -766,11 +767,6 @@ model JournalEntry {
   @@map("journal_entries")
 }
 
-// Lines must balance per entry: SUM(debit) = SUM(credit). Enforced at the
-// database level by a deferred constraint trigger (see the migration SQL) —
-// Prisma cannot express triggers, so it lives only in the migration. Lines
-// must therefore always be written inside a transaction together with their
-// entry; a lone unbalanced insert is rejected at COMMIT.
 model JournalLine {
   id             String  @id @default(uuid())
   journalEntryId String  @map("journal_entry_id")
@@ -941,7 +937,7 @@ model Branch {
   agencyId String @map("agency_id")
   agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
 
-  name String
+  name String @unique
 
   address String
 
@@ -950,15 +946,29 @@ model Branch {
   whatsapp String?
 
   managerStaffId String?      @map("manager_staff_id")
-  managerStaff   AgencyStaff? @relation(fields: [managerStaffId], references: [id], onDelete: SetNull)
+  managerStaff   AgencyStaff? @relation("BranchManager", fields: [managerStaffId], references: [id], onDelete: SetNull)
 
   isHeadOffice Boolean @default(false) @map("is_head_office")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  packageBranches PackageBranch[]
+  bookings        Booking[]
+
   @@index([agencyId])
+  @@index([managerStaffId])
   @@map("branches")
+}
+
+model PackageBranch {
+  packageId String
+  branchId  String
+
+  package TrekPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  branch  Branch      @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([packageId, branchId])
 }
 
 model StripeSubscription {

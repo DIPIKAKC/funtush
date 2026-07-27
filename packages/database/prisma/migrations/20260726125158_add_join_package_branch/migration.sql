@@ -1,0 +1,33 @@
+/*
+  Warnings:
+
+  - A unique constraint covering the columns `[name]` on the table `branches` will be added. If there are existing duplicate values, this will fail.
+  - Added the required column `updated_at` to the `kyc_submissions` table without a default value. This is not possible if the table is not empty.
+  - Added the required column `current_period_start` to the `stripe_subscriptions` table without a default value. This is not possible if the table is not empty.
+
+*/
+-- AlterTable
+ALTER TABLE "bookings" ADD COLUMN     "branch_id" TEXT;
+
+-- AlterTable
+ALTER TABLE "trek_packages" ADD COLUMN     "availableToAllBranches" BOOLEAN NOT NULL DEFAULT true;
+
+-- CreateTable
+CREATE TABLE "PackageBranch" (
+    "packageId" TEXT NOT NULL,
+    "branchId" TEXT NOT NULL,
+
+    CONSTRAINT "PackageBranch_pkey" PRIMARY KEY ("packageId","branchId")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "branches_name_key" ON "branches"("name");
+
+-- AddForeignKey
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_branch_id_fkey" FOREIGN KEY ("branch_id") REFERENCES "branches"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PackageBranch" ADD CONSTRAINT "PackageBranch_packageId_fkey" FOREIGN KEY ("packageId") REFERENCES "trek_packages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PackageBranch" ADD CONSTRAINT "PackageBranch_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "branches"("id") ON DELETE CASCADE ON UPDATE CASCADE;

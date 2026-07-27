@@ -1,5 +1,6 @@
 import { db } from '@funtush/database';
 import { generateDynamicQRCode, verifyFonepayTransaction } from '../utils/fonepay';
+import { notificationService } from './notificationService';
 
 export async function activateFonepay(agencyId: string) {
   // Check KYC approval - NOTE: 'kycSubmission' (lowercase k)
@@ -116,6 +117,20 @@ export async function processAndVerifyFonepayTransaction(
   const isValid = await verifyFonepayTransaction(transactionId, amount);
 
   if (!isValid) {
+    try {
+      await notificationService.sendEmailNotification(
+        trekkerEmail,
+        'trekker_payment_failed',
+        {
+          agencyName: agency.name,
+          amount,
+          transactionId,
+        }
+      );
+    } catch (err) {
+      console.error('[Notification] Fonepay failure notify error:', err);
+    }
+
     throw new Error('Fonepay transaction verification failed');
   }
 
@@ -134,6 +149,22 @@ export async function processAndVerifyFonepayTransaction(
       verifiedAt: new Date(),
     },
   });
+
+  try {
+    await notificationService.sendEmailNotification(
+      trekkerEmail,
+      'trekker_payment_confirmed',
+      {
+        agencyName: agency.name,
+        amount,
+        netAmount,
+        transactionId,
+        bookingId: bookingId || 'N/A',
+      }
+    );
+  } catch (err) {
+    console.error('[Notification] Fonepay success notify error:', err);
+  }
 
   return transaction;
 }
