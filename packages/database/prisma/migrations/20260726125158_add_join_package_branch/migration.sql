@@ -24,9 +24,6 @@ CREATE TABLE "PackageBranch" (
 CREATE UNIQUE INDEX "branches_name_key" ON "branches"("name");
 
 -- CreateIndex
-CREATE INDEX "kyc_submissions_agency_id_idx" ON "kyc_submissions"("agency_id");
-
--- CreateIndex
 CREATE INDEX "kyc_submissions_status_idx" ON "kyc_submissions"("status");
 
 -- CreateIndex
