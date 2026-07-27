@@ -23,12 +23,6 @@ CREATE TABLE "PackageBranch" (
 -- CreateIndex
 CREATE UNIQUE INDEX "branches_name_key" ON "branches"("name");
 
--- CreateIndex
-CREATE INDEX "kyc_submissions_status_idx" ON "kyc_submissions"("status");
-
--- CreateIndex
-CREATE INDEX "stripe_subscriptions_stripe_customer_id_idx" ON "stripe_subscriptions"("stripe_customer_id");
-
 -- AddForeignKey
 ALTER TABLE "bookings" ADD CONSTRAINT "bookings_branch_id_fkey" FOREIGN KEY ("branch_id") REFERENCES "branches"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
