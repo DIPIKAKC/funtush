@@ -47,7 +47,11 @@ export const createBranchService = async (
         },
         select: {
             id: true,
-            subscriptionTier: true
+            tier: {
+                select: {
+                    name: true
+                }
+            }
         }
     });
 
@@ -60,14 +64,13 @@ export const createBranchService = async (
         }
     });
 
-    const limit =
-        BRANCH_LIMIT[
-        agency.subscriptionTier as keyof typeof BRANCH_LIMIT
-        ];
+    const tier = agency.tier.name as keyof typeof BRANCH_LIMIT;
+
+    const limit = BRANCH_LIMIT[tier];
 
     if (totalBranches >= limit) {
         throw new Error(
-            `Your ${agency.subscriptionTier} plan allows only ${limit} branch(es).`
+            `Your ${tier} plan allows only ${limit} branch(es).`
         );
     }
 
@@ -187,12 +190,10 @@ export const getBranchesService = async (
             address: true,
             phone: true,
             whatsapp: true,
-            is_head_office: true,
+            isHeadOffice: true,
             managerStaff: {
                 select: {
-                    id: true,
-                    fullName: true,
-                    email: true
+                    id: true
                 }
             },
         },
@@ -209,7 +210,7 @@ interface assignguidepayload {
     branchId: string
 }
 interface assignpackagepayload {
-    branchIds: string[]
+    branchId: string
     shareAcrossAll: boolean
 }
 
@@ -355,21 +356,35 @@ export const assignPackageToBranchService = async (
         }
     });
 
-    if (!agencyUser)
+    if (!agencyUser) {
         throw new Error("Agency user not found");
+    }
 
+
+    // Check package exists and belongs to agency
     const packageItem = await db.trekPackage.findFirst({
         where: {
             id: packageId,
-            agencyId: agencyUser.agencyId
         }
     });
 
-    if (!packageItem)
+    if (!packageItem) {
         throw new Error("Package not found");
+    }
 
+    if (packageItem.agencyId !== agencyUser.agencyId) {
+        throw new Error("You cannot assign this package");
+    }
+
+
+    // Share package across all branches
     if (data.shareAcrossAll) {
-        await db.trekPackage.update({
+
+        if (packageItem.availableToAllBranches === true) {
+            throw new Error("Package is already available to all branches");
+        }
+
+        return await db.trekPackage.update({
             where: {
                 id: packageItem.id
             },
@@ -378,50 +393,75 @@ export const assignPackageToBranchService = async (
                 packageBranches: {
                     deleteMany: {}
                 }
-            }
-        });
-
-    } else {
-        if (!data.branchIds?.length)
-            throw new Error("Please select at least one branch");
-
-        const branches = await db.branch.findMany({
-            where: {
-                agencyId: agencyUser.agencyId,
-                id: {
-                    in: data.branchIds
-                }
-            }
-        });
-
-        if (branches.length !== data.branchIds.length)
-            throw new Error("Invalid branch selected");
-
-        await db.trekPackage.update({
-            where: {
-                id: packageItem.id
             },
-            data: {
-                availableToAllBranches: false,
-
+            include: {
                 packageBranches: {
-                    deleteMany: {},
-
-                    create: data.branchIds.map(branchId => ({
+                    include: {
                         branch: {
-                            connect: {
-                                id: branchId
+                            select: {
+                                id: true,
+                                name: true
                             }
                         }
-                    }))
+                    }
                 }
             }
         });
     }
 
-    return db.trekPackage.findUnique({
+
+    if (!data.branchId) {
+        throw new Error("Please select at least one branch.");
+    }
+
+
+    // Validate branch belongs to same agency
+    const branch = await db.branch.findFirst({
+        where: {
+            id: data.branchId,
+            agencyId: agencyUser.agencyId
+        },
+        select: {
+            id: true
+        }
+    });
+
+    if (!branch) {
+        throw new Error("Invalid branch");
+    }
+
+    // Check duplicate assignment
+    const existingAssignment = await db.packageBranch.findUnique({
+        where: {
+            packageId_branchId: {
+                packageId,
+                branchId: data.branchId
+            }
+        }
+    });
+
+    if (existingAssignment) {
+        throw new Error("Package already assigned");
+    }
+
+
+    // Assign package to branches
+    return await db.trekPackage.update({
         where: {
             id: packageItem.id
+        },
+        data: {
+            availableToAllBranches: false,
+
+            packageBranches: {
+                create: {
+                    branch: {
+                        connect: {
+                            id: data.branchId
+                        }
+                    }
+                }
+            }
         },
         include: {
             packageBranches: {
@@ -436,7 +476,8 @@ export const assignPackageToBranchService = async (
             }
         }
     });
-}
+};
+
 
 export const getBranchReportService = async (
     agencyUserId: string,
