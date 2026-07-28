@@ -130,6 +130,25 @@ async function main() {
     }
   });
 
+
+  await prisma.agencyStaff.upsert({
+    where: { id: "10000000-0000-0000-0000-000000000001" },
+    update: {},
+    create: {
+      agencyId: "a4d400b0-3b33-4bac-8cab-027e5e181c79",
+      userId: "354d5ded-25b9-4bf1-be69-1325589771cf"
+    }
+  });
+
+  await prisma.subscription.upsert({
+    where: { id: "10000000-0000-0000-0000-000000000000" },
+    update: {},
+    create: {
+      agencyId: "a4d400b0-3b33-4bac-8cab-027e5e181c79",
+      tierId: "b6c1cc5d-c82c-4b01-89da-7223d7284b77"
+    }
+  });
+
   // Test package + departure date for E2E booking flow 
   const testPackage = await prisma.trekPackage.upsert({
     where: { slug: "everest-base-camp-test" },
@@ -138,6 +157,22 @@ async function main() {
       agencyId: testAgency.id,
       title: "Everest Base Camp Trek (Test)",
       slug: "everest-base-camp-test",
+      description: "Test package for E2E booking flow testing.",
+      durationDays: 14,
+      pricePerPerson: 1200,
+      difficulty: "CHALLENGING",
+      maxGroupSize: 10,
+      status: "PUBLISHED",
+    },
+  });
+  
+  const testPackage2 = await prisma.trekPackage.upsert({
+    where: { slug: "abc-test" },
+    update: { status: "PUBLISHED" },
+    create: {
+      agencyId: "a4d400b0-3b33-4bac-8cab-027e5e181c79",
+      title: "ABC Trek (Test)",
+      slug: "ABC-test",
       description: "Test package for E2E booking flow testing.",
       durationDays: 14,
       pricePerPerson: 1200,
