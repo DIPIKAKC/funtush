@@ -29,7 +29,6 @@ interface UpdateCouponPayload {
 }
 
 interface applyCoupon {
-    agencyId: string;
     couponCode: string;
     packageId: string;
     bookingValue: number;
@@ -312,7 +311,21 @@ export const validateAndApplyCoupon = async (
 ) => {
 
     const code = data.couponCode.trim().toUpperCase();
-    const agencyId = data?.agencyId;
+
+    const pkg = await db.trekPackage.findUnique({
+        where: {
+            id: data.packageId,
+        },
+        select: {
+            agencyId: true,
+        },
+    });
+
+    if (!pkg) {
+        throw new Error("Package not found.");
+    }
+
+    const agencyId = pkg.agencyId;
 
     const coupon = await db.coupon.findUnique({
         where: {
@@ -386,7 +399,7 @@ export const validateAndApplyCoupon = async (
         const previousBooking = await db.booking.findFirst({
             where: {
                 trekkerEmail: data.trekkerEmail,
-                status:{
+                status: {
                     not: BookingStatus.REJECTED,
                 }
             },
