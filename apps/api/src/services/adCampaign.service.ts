@@ -1,12 +1,4 @@
-/**
- * Ad campaign queue — business logic.
- *
- * Mirrors the KYC service: queue of PENDING items reviewed by an admin who
- * either approves (push live on Meta + Google) or rejects (email reason back),
- * plus monitoring of ACTIVE campaigns and an immediate pause.
- *
- * Lives under src/services/.
- */
+
 import { prisma } from "../packages/database/prisma";
 import { queueEmail } from "../lib/emailQueue";
 import { pushCampaignLive, pausePlatformCampaign } from "../lib/adPlatforms";

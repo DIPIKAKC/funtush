@@ -920,8 +920,11 @@ model JournalLine {
 }
 
 enum AdCampaignStatus {
+  DRAFT
   PENDING
+  PENDING_APPROVAL
   ACTIVE
+  APPROVED
   REJECTED
   PAUSED
 }
