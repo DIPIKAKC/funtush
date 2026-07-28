@@ -13,6 +13,7 @@ import marketplaceRoutes from "./routes/marketplace.routes.js";
 import mobileRoutes from "./routes/mobile.routes.js";
 import reviewRoutes from "./routes/review.route.js";
 import couponRoutes from "./routes/coupon.route.js";
+import branchRoutes from "./routes/branches.routes.js";
 import financeRoutes from "./routes/finance.route.js";
 import staffRoutes from "./routes/staff.routes";
 import adminRoutes from "./routes/admin/index.js";
@@ -42,6 +43,10 @@ app.use(express.json());
 app.use("/", uploadRoutes);
 app.use("/", agencyRoutes);
 app.use("/", agencyCustomerRoutes);
+app.use("/", reviewRoutes);
+app.use("/", couponRoutes);
+app.use("/", branchRoutes);
+
 app.use("/", trekkerRoutes);
 app.use("/", packageRoutes);
 app.use("/marketplace", marketplaceRoutes);
@@ -56,8 +61,6 @@ app.use("/fraud", fraudRouter);
 // Analytics Routes
 app.use("/", agencyAnalyticsRoutes);
 
-app.use("/", reviewRoutes);
-app.use("/", couponRoutes);
 app.use("/", financeRoutes);
 
 // NEW: Email & SOS Routes

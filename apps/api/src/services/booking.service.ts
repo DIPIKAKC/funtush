@@ -6,6 +6,7 @@ import { sendInquiryConfirmationEmail, sendAgencyInquiryAlertEmail } from "../ut
 import { notifyAgencyAdmins, notifyTrekker } from "./notification.service.js";
 import { confirmSlotsForBooking } from "./departureDate.service.js";
 import { recordConversion } from "./marketplaceAnalytics.service.js";
+import { validateAndApplyCoupon } from "./coupon.service";
 
 //Types
 export interface InquiryInput {
@@ -18,6 +19,8 @@ export interface InquiryInput {
   trekkerPhone: string;
   trekkerCountry?: string;
   specialRequests?: string;
+
+  couponCode?: string;
 }
 
 // Redis key helpers
@@ -88,6 +91,35 @@ export async function submitInquiry(input: InquiryInput) {
 
   const totalPrice = basePrice + addOnTotal;
 
+  /**coupon */
+  let finalPrice = totalPrice;
+  let couponData:
+    | {
+      couponId: string;
+      couponCode: string;
+      discount: number;
+    }
+    | null = null;
+
+  if (input.couponCode) {
+    const couponResult = await validateAndApplyCoupon({
+      couponCode: input.couponCode,
+      packageId,
+      bookingValue: totalPrice,
+      groupSize,
+      trekkerEmail
+    });
+
+    finalPrice = couponResult.finalAmount;
+
+    couponData = {
+      couponId: couponResult.couponId,
+      discount: couponResult.discount,
+      couponCode: couponResult.couponCode
+    };
+  }
+  /** */
+
   // Generate a session token to tie OTP → inquiry data
   const { randomBytes } = await import("crypto");
   const sessionToken = randomBytes(20).toString("hex");
@@ -95,7 +127,11 @@ export async function submitInquiry(input: InquiryInput) {
   // Store temp inquiry data in Redis (expires with OTP)
   await redis.set(
     dataKey(sessionToken),
-    JSON.stringify({ ...input, agencyId: pkg.agencyId, totalPrice }),
+    JSON.stringify({
+      ...input, agencyId: pkg.agencyId, totalPrice,
+      finalPrice,
+      couponData
+    }),
     "EX",
     TTL
   );
@@ -133,7 +169,16 @@ export async function verifyInquiryOtp(sessionToken: string, otp: string) {
     throw new Error("Session data expired");
   }
 
-  const data: InquiryInput & { agencyId: string; totalPrice: number } =
+  const data: InquiryInput & {
+    agencyId: string;
+    totalPrice: number;
+    finalPrice?: number;
+    couponData?: {
+      couponId: string;
+      discount: number;
+      couponCode: string;
+    };
+  } =
     JSON.parse(raw);
 
   // Re-check availability (slots may have changed during OTP window)
@@ -155,7 +200,7 @@ export async function verifyInquiryOtp(sessionToken: string, otp: string) {
       packageId: data.packageId,
       departureDateId: data.departureDateId,
       groupSize: data.groupSize,
-      totalPrice: data.totalPrice,
+      totalPrice: data.finalPrice ?? data.totalPrice,
       status: "INQUIRY",
       trekkerName: data.trekkerName,
       trekkerEmail: data.trekkerEmail,
@@ -197,6 +242,24 @@ export async function verifyInquiryOtp(sessionToken: string, otp: string) {
       }),
     });
   }
+
+  /**Increment coupon redemption */
+  if (data.couponData?.couponId) {
+
+    await prisma.coupon.update({
+      where: {
+        id: data.couponData.couponId
+      },
+      data: {
+        redemptionsUsed: {
+          increment: 1
+        }
+      }
+    });
+
+  }
+  /** */
+
 
   // Clean up Redis
   await redis.del(otpKey(sessionToken));

@@ -6,10 +6,10 @@ const router = Router();
 
 router.route('/agencies/me/branches')
     .get(authenticateWithRefreshToken, getAgencyBranches)
-    .post(createBranch);
+    .post(authenticateWithRefreshToken, createBranch);
 
 router.route('/agencies/me/branches/:id')
-    .patch(updateBranch);
+    .patch(authenticateWithRefreshToken, updateBranch);
 
 router.route('/agencies/me/staff/:id/branch')
     .patch(authenticateWithRefreshToken, assignStaffToBranch);
