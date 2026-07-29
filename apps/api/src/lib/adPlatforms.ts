@@ -1,26 +1,22 @@
-/**
- * Ad platform adapters — Meta (Facebook) Marketing API + Google Ads API.
- *
- * These are STUBS so the admin queue works end-to-end in dev without live
- * credentials. They simulate pushing a creative live, pausing it, and reading
- * back delivery metrics. Swap the bodies for real SDK calls when you have keys:
- *   - Meta:   facebook-nodejs-business-sdk   (Marketing API)
- *   - Google: google-ads-api                 (Google Ads API)
- *
- * Lives alongside emailQueue.ts under src/lib/.
- */
-
-import { randomUUID } from "crypto";
+import {
+  createMetaCampaign,
+  pauseMetaCampaign,
+  type CampaignForMeta,
+} from "../services/metaAdsService";
+import type { TargetingParams } from "../services/targetingBuilderService";
 
 export interface CampaignCreative {
+  campaignId: string;
+  agencyName: string;
   imageUrls: string[];
   copyText: string;
-  targetingParams: unknown;
+  dailyBudgetCents: number;
+  targetingParams: unknown; 
 }
 
 export interface PlatformIds {
   metaCampaignId: string;
-  googleCampaignId: string;
+  googleCampaignId: string | null;
 }
 
 export interface CampaignMetrics {
@@ -29,35 +25,45 @@ export interface CampaignMetrics {
   spend: number;
 }
 
-/**
- * Push a creative live on both Meta and Google. Returns the external campaign
- * IDs so we can pause / report on them later.
- */
 export async function pushCampaignLive(
   creative: CampaignCreative
 ): Promise<PlatformIds> {
-  // TODO: real Meta Marketing API call — create Campaign -> AdSet -> Ad
-  // TODO: real Google Ads API call     — create Campaign -> AdGroup -> Ad
-  void creative;
+  const metaResult = await createMetaCampaign({
+    id: creative.campaignId,
+    copyText: creative.copyText,
+    imageUrls: creative.imageUrls,
+    dailyBudgetCents: creative.dailyBudgetCents,
+    targetingParams: creative.targetingParams as TargetingParams,
+    agencyName: creative.agencyName,
+  } satisfies CampaignForMeta);
+
+  // TODO: real Google Ads API call — create Campaign -> AdGroup -> Ad
+  const googleCampaignId: string | null = null;
+
   return {
-    metaCampaignId: `meta_${randomUUID()}`,
-    googleCampaignId: `ggl_${randomUUID()}`,
+    metaCampaignId: metaResult.metaCampaignId,
+    googleCampaignId,
   };
 }
 
-/**
- * Pause a live campaign on both platforms. Should be idempotent — pausing an
- * already-paused campaign must not throw.
- */
 export async function pausePlatformCampaign(ids: PlatformIds): Promise<void> {
-  // TODO: Meta   — POST /{campaign-id} { status: "PAUSED" }
+  if (ids.metaCampaignId) {
+    await pauseMetaCampaign(ids.metaCampaignId);
+  }
+
   // TODO: Google — campaignOperations.update status = PAUSED
-  void ids;
+  if (ids.googleCampaignId) {
+    console.warn(
+      `[adPlatforms] googleCampaignId ${ids.googleCampaignId} present but Google Ads pause is not yet implemented`
+    );
+  }
 }
 
 /**
- * Fetch fresh delivery metrics for a live campaign. In production this hits the
- * insights endpoints; here it returns zeros for the caller to merge in.
+ * Fetch fresh delivery metrics for a live campaign. Meta side is still a
+ * stub — wire this to Meta's /insights endpoint when ready to pull real
+ * impressions/clicks/spend for the periodic sync job mentioned in
+ * adCampaign.service.ts's getActiveCampaigns().
  */
 export async function fetchCampaignMetrics(
   ids: PlatformIds

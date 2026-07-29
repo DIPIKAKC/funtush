@@ -947,6 +947,8 @@ model AdCampaign {
   googleCampaignId String?
   rejectionReason  String?
 
+  dailyBudgetCents Int @default(1000) @map("daily_budget_cents")
+
   createdAt  DateTime  @default(now())
   approvedAt DateTime?
   rejectedAt DateTime?
