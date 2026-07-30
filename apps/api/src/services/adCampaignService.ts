@@ -92,6 +92,7 @@ export async function approveCampaign(id: string) {
       status: "ACTIVE",
       metaCampaignId: ids.metaCampaignId,
       googleCampaignId: ids.googleCampaignId,
+      googleSearchCampaignId: ids.googleSearchCampaignId,
       approvedAt: new Date(),
     },
   });
@@ -153,6 +154,7 @@ export async function pauseCampaign(id: string) {
   await pausePlatformCampaign({
     metaCampaignId: campaign.metaCampaignId ?? "",
     googleCampaignId: campaign.googleCampaignId ?? "",
+    googleSearchCampaignId: campaign.googleSearchCampaignId ?? "",
   });
 
   return prisma.adCampaign.update({

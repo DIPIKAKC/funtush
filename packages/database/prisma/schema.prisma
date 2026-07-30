@@ -945,7 +945,10 @@ model AdCampaign {
 
   metaCampaignId   String?
   googleCampaignId String?
+  googleSearchCampaignId String?
   rejectionReason  String?
+
+  performanceDaily AdPerformanceDaily[]
 
   dailyBudgetCents Int @default(1000) @map("daily_budget_cents")
 
@@ -957,6 +960,28 @@ model AdCampaign {
 
   @@index([status])
   @@index([agencyId])
+}
+
+enum AdPlatform {
+  META
+  GOOGLE
+}
+
+model AdPerformanceDaily {
+  id          String     @id @default(cuid())
+  campaignId  String     @map("campaign_id")
+  campaign    AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  platform    AdPlatform
+  date        DateTime   @db.Date
+  impressions Int        @default(0)
+  clicks      Int        @default(0)
+  spend       Decimal    @default(0) @db.Decimal(12, 2)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@unique([campaignId, platform, date])
+  @@index([campaignId])
+  @@map("ad_performance_daily")
 }
 
 model MarketplaceImpression {

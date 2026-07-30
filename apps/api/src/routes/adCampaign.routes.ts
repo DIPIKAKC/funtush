@@ -92,6 +92,46 @@ router.get(
   }
 );
 
+// GET /agencies/me/ad-campaigns/:id/performance
+router.get(
+  '/:id/performance',
+  authenticateWithRefreshToken,
+  checkAgencyStatus,
+  async (req: AgencyRequest, res) => {
+    try {
+      const { id } = req.params as { id: string };
+      const agencyId = req.agencyId;
+
+      if (!agencyId) {
+        return res.status(401).json({ error: 'Agency not found' });
+      }
+
+      const { syncAndGetCampaignPerformance } = await import(
+        '../services/adPerformanceService'
+      );
+
+      const performance = await syncAndGetCampaignPerformance(
+        id,
+        agencyId
+      );
+
+      res.json({
+        success: true,
+        data: performance,
+      });
+    } catch (err) {
+      console.error('Failed to fetch campaign performance:', err);
+
+      res.status(400).json({
+        error:
+          err instanceof Error
+            ? err.message
+            : 'Failed to fetch performance data',
+      });
+    }
+  }
+);
+
 // POST /agencies/me/ad-campaigns/:id/targeting
 router.post(
   '/:id/targeting',

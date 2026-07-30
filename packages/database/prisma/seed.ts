@@ -70,8 +70,12 @@ async function main() {
     }
   ];
 
+  // Capture created users by email so later seed steps (agencyStaff, etc.)
+  // can reference their REAL ids instead of stale hardcoded ones.
+  const usersByEmail: Record<string, Awaited<ReturnType<typeof prisma.user.upsert>>> = {};
+
   for (const user of users) {
-    await prisma.user.upsert({
+    usersByEmail[user.email] = await prisma.user.upsert({
       where: { email: user.email },
       update: {
         passwordHash,
@@ -86,6 +90,8 @@ async function main() {
       }
     });
   }
+
+  const agencyAdminUser = usersByEmail["agency@funtush.com"];
 
   const permissions = [
     { key: "USER_READ", description: "Read users" },
@@ -102,7 +108,7 @@ async function main() {
     });
   }
 
-  // const freeTier = 
+  // const freeTier =
   await prisma.subscriptionTier.upsert({
     where: { name: "FREE" },
     update: {},
@@ -130,13 +136,30 @@ async function main() {
     }
   });
 
+  const agencyUserLink = await prisma.agencyUser.upsert({
+    where: {
+      agencyId_userId: {
+        agencyId: testAgency.id,
+        userId: agencyAdminUser.id,
+      },
+    },
+    update: {},
+    create: {
+      agencyId: testAgency.id,
+      userId: agencyAdminUser.id,
+      role: "AGENCY_ADMIN",
+    },
+  });
 
+  // explicitly, or Prisma generates a new random id every time and the
+  // `where: { id: ... }` match never hits on future runs.
   await prisma.agencyStaff.upsert({
     where: { id: "10000000-0000-0000-0000-000000000001" },
     update: {},
     create: {
-      agencyId: "a4d400b0-3b33-4bac-8cab-027e5e181c79",
-      userId: "354d5ded-25b9-4bf1-be69-1325589771cf"
+      id: "10000000-0000-0000-0000-000000000001",
+      agencyId: testAgency.id,
+      userId: agencyUserLink.id
     }
   });
 
@@ -144,12 +167,13 @@ async function main() {
     where: { id: "10000000-0000-0000-0000-000000000000" },
     update: {},
     create: {
-      agencyId: "a4d400b0-3b33-4bac-8cab-027e5e181c79",
-      tierId: "b6c1cc5d-c82c-4b01-89da-7223d7284b77"
+      id: "10000000-0000-0000-0000-000000000000",
+      agencyId: testAgency.id,
+      tierId: freeTierId
     }
   });
 
-  // Test package + departure date for E2E booking flow 
+  // Test package + departure date for E2E booking flow
   const testPackage = await prisma.trekPackage.upsert({
     where: { slug: "everest-base-camp-test" },
     update: { status: "PUBLISHED" },
@@ -165,14 +189,14 @@ async function main() {
       status: "PUBLISHED",
     },
   });
-  
+
   const testPackage2 = await prisma.trekPackage.upsert({
     where: { slug: "abc-test" },
     update: { status: "PUBLISHED" },
     create: {
-      agencyId: "a4d400b0-3b33-4bac-8cab-027e5e181c79",
+      agencyId: testAgency.id,
       title: "ABC Trek (Test)",
-      slug: "ABC-test",
+      slug: "abc-test", 
       description: "Test package for E2E booking flow testing.",
       durationDays: 14,
       pricePerPerson: 1200,

@@ -49,6 +49,7 @@ export async function getActiveCampaigns() {
       spend: true,
       metaCampaignId: true,
       googleCampaignId: true,
+      googleSearchCampaignId: true,
       approvedAt: true,
       agency: { select: { id: true, name: true } },
     },
@@ -60,19 +61,40 @@ export async function approveCampaign(id: string) {
     where: { id },
     include: { agency: { select: agencySummary } },
   });
-  if (!campaign) throw new CampaignError(404, "Campaign not found");
-  if (campaign.status !== "PENDING_APPROVAL") {
-    throw new CampaignError(409, `Campaign already ${campaign.status.toLowerCase()}`);
+
+  if (!campaign) {
+    throw new CampaignError(404, "Campaign not found");
   }
 
-  const ids = await pushCampaignLive({
-    imageUrls: campaign.imageUrls,
-    copyText: campaign.copyText,
-    targetingParams: campaign.targetingParams,
-    dailyBudgetCents: campaign.dailyBudgetCents,
-    agencyName: campaign.agency.name,
-    campaignId: campaign.id,
-  });
+  if (campaign.status !== "PENDING_APPROVAL") {
+    throw new CampaignError(
+      409,
+      `Campaign already ${campaign.status.toLowerCase()}`
+    );
+  }
+
+  let ids: {
+    metaCampaignId: string | null;
+    googleCampaignId: string | null;
+    googleSearchCampaignId: string | null;
+  };
+
+  try {
+    ids = await pushCampaignLive({
+      campaignId: campaign.id,
+      imageUrls: campaign.imageUrls,
+      copyText: campaign.copyText,
+      targetingParams: campaign.targetingParams,
+      dailyBudgetCents: campaign.dailyBudgetCents,
+      agencyName: campaign.agency.name,
+    });
+  } catch (err) {
+    throw new CampaignError(
+      502,
+      `Failed to push campaign live: ${err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
 
   const updated = await prisma.adCampaign.update({
     where: { id },
@@ -80,6 +102,7 @@ export async function approveCampaign(id: string) {
       status: "ACTIVE",
       metaCampaignId: ids.metaCampaignId,
       googleCampaignId: ids.googleCampaignId,
+      googleSearchCampaignId: ids.googleSearchCampaignId,
       approvedAt: new Date(),
     },
   });
@@ -135,10 +158,18 @@ export async function pauseCampaign(id: string) {
     );
   }
 
-  await pausePlatformCampaign({
-    metaCampaignId: campaign.metaCampaignId ?? "",
-    googleCampaignId: campaign.googleCampaignId ?? "",
-  });
+  try {
+    await pausePlatformCampaign({
+      metaCampaignId: campaign.metaCampaignId ?? "",
+      googleCampaignId: campaign.googleCampaignId ?? "",
+      googleSearchCampaignId: campaign.googleSearchCampaignId ?? "",
+    });
+  } catch (err) {
+    throw new CampaignError(
+      502,
+      `Failed to pause campaign on platform(s): ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
 
   return prisma.adCampaign.update({
     where: { id },

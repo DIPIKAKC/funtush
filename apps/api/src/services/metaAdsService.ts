@@ -61,31 +61,97 @@ async function findInterestId(keyword: string): Promise<{ id: string; name: stri
   return data.data?.[0] ?? null;
 }
 
-async function buildMetaTargeting(params: TargetingParams) {
+async function buildMetaTargeting(
+  params: TargetingParams,
+  regionNames: string[]
+) {
   const interestKeywords: string[] = [];
+
   if (params.interests.adventureTravel) interestKeywords.push('Adventure travel');
   if (params.interests.trekking) interestKeywords.push('Hiking');
   if (params.interests.culturalTourism) interestKeywords.push('Cultural tourism');
   if (params.interests.mountaineering) interestKeywords.push('Mountaineering');
 
   const interestResults = await Promise.all(interestKeywords.map(findInterestId));
+
   const interests = interestResults
     .filter((r): r is { id: string; name: string } => r !== null)
-    .map((r) => ({ id: r.id, name: r.name }));
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+    }));
+
+  void regionNames;
 
   return {
     geo_locations: {
-      // Meta needs country/region/city codes, not raw destination names.
-      // Falls back to Nepal at the country level until region names are
-      // mapped to Meta's location-search IDs (see TODO below).
       countries: ['NP'],
     },
-    flexible_spec: interests.length > 0 ? [{ interests }] : undefined,
-    // TODO: behavioral retargeting (Funtush marketplace searchers/viewers) and
-    // lookalike audiences require a Meta Custom Audience built from a pixel or
-    // uploaded customer list — not available from targetingParams alone.
-    // That's a separate integration (Meta Conversions API / Custom Audiences),
-    // likely a follow-up ticket rather than part of this initial push-live step.
+    flexible_spec: interests.length ? [{ interests }] : undefined,
+  };
+}
+
+export interface MetaMetrics {
+  impressions: number;
+  clicks: number;
+  spend: number;
+}
+
+export async function fetchMetaCampaignMetrics(
+  metaCampaignId: string,
+  date: string
+): Promise<MetaMetrics> {
+  if (!META_ACCESS_TOKEN) {
+    return {
+      impressions: 0,
+      clicks: 0,
+      spend: 0,
+    };
+  }
+
+  const params = new URLSearchParams({
+    fields: 'impressions,clicks,spend',
+    time_range: JSON.stringify({
+      since: date,
+      until: date,
+    }),
+    access_token: META_ACCESS_TOKEN,
+  });
+
+  const res = await fetch(`${GRAPH_BASE}/${metaCampaignId}/insights?${params.toString()}`);
+
+  const data = (await res.json()) as {
+    data?: {
+      impressions?: string;
+      clicks?: string;
+      spend?: string;
+    }[];
+  } & MetaApiError;
+
+  if (data.error) {
+    console.error('[META] Metrics fetch failed:', data.error.message);
+
+    return {
+      impressions: 0,
+      clicks: 0,
+      spend: 0,
+    };
+  }
+
+  const row = data.data?.[0];
+
+  if (!row) {
+    return {
+      impressions: 0,
+      clicks: 0,
+      spend: 0,
+    };
+  }
+
+  return {
+    impressions: Number(row.impressions ?? 0),
+    clicks: Number(row.clicks ?? 0),
+    spend: Number(row.spend ?? 0),
   };
 }
 
@@ -142,8 +208,11 @@ export async function createMetaCampaign(
   });
 
   // 2. AdSet
-  const targeting = await buildMetaTargeting(campaign.targetingParams);
-
+  const targeting = await buildMetaTargeting(
+    campaign.targetingParams,
+    []
+  );
+  
   const adSetRes = await metaPost<{ id: string }>(`${adAccountId}/adsets`, {
     name: `AdSet - ${campaign.id}`,
     campaign_id: campaignRes.id,
