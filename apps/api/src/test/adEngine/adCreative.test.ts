@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { db } from '@funtush/database';
-import { generateAdCampaign } from '../../services/adCampaignService'; 
-import { generateCreativeVariations } from '../../utils/creativeGenerator'; 
-import type { AdCreative } from '../../utils/creativeGenerator'; 
+import { generateAdCampaign } from '../../services/adCampaignService';
+import { generateCreativeVariations } from '../../utils/creativeGenerator';
 
-describe('DAY 1: Ad Creative Generation', () => {
+describe('Ad Creative Generation', () => {
   const mockAgencyId = 'agency_ads_' + Date.now();
   const mockTierId = 'tier_ads_' + Date.now();
 
@@ -76,23 +75,31 @@ describe('DAY 1: Ad Creative Generation', () => {
   });
 
   afterAll(async () => {
-    // Cleanup
     await db.adCampaign.deleteMany({ where: { agencyId: mockAgencyId } });
     await db.trekItinerary.deleteMany({
       where: { package: { agencyId: mockAgencyId } },
     });
     await db.trekPackage.deleteMany({ where: { agencyId: mockAgencyId } });
     await db.agencyProfile.deleteMany({ where: { agencyId: mockAgencyId } });
-    await db.agency.deleteMany({ where: { id: mockAgencyId } });
-    await db.subscriptionTier.deleteMany({ where: { id: mockTierId } });
+    await db.agency.deleteMany({ where: { id: mockAgencyId } }); // DELETE FIRST
+    await db.subscriptionTier.deleteMany({ where: { id: mockTierId } }); // THEN TIERS
   });
+
+  interface CreativeVariation {
+    variant: number;
+    title: string;
+    copyText: string;
+    imageUrls: string[];
+  }
 
   describe('Creative Generation', () => {
     it('should generate 3 creative variations from package data', async () => {
       const result = await generateAdCampaign(mockAgencyId);
 
-      expect(result.creatives).toHaveLength(3);
-      result.creatives.forEach((creative: AdCreative, idx: number) => {
+      const creatives = (result.targetingParams as Record<string, unknown>)
+        .creativeVariations as CreativeVariation[];
+      expect(creatives).toHaveLength(3);
+      creatives.forEach((creative, idx) => {
         expect(creative.variant).toBe(idx + 1);
         expect(creative.title).toBeTruthy();
         expect(creative.copyText).toBeTruthy();
@@ -103,14 +110,18 @@ describe('DAY 1: Ad Creative Generation', () => {
     it('should use agency logo and name in creatives', async () => {
       const result = await generateAdCampaign(mockAgencyId);
 
-      const fullCopy = result.creatives.map((c: AdCreative) => c.copyText).join(' ');
+      const creatives = (result.targetingParams as Record<string, unknown>)
+        .creativeVariations as CreativeVariation[];
+      const fullCopy = creatives.map((c) => c.copyText).join(' ');
       expect(fullCopy).toContain('Ads Test Agency');
     });
 
     it('should include package photos in imageUrls', async () => {
       const result = await generateAdCampaign(mockAgencyId);
 
-      const allImages = result.creatives.flatMap((c: AdCreative) => c.imageUrls);
+      const creatives = (result.targetingParams as Record<string, unknown>)
+        .creativeVariations as CreativeVariation[];
+      const allImages = creatives.flatMap((c) => c.imageUrls);
       expect(allImages.length).toBeGreaterThan(0);
       allImages.forEach((img: string) => {
         expect(img).toContain('https://example.com/photo');
@@ -135,13 +146,8 @@ describe('DAY 1: Ad Creative Generation', () => {
 
       const creatives = generateCreativeVariations(testData);
 
-      // Variation 1 should mention adventure/difficulty
       expect(creatives[0].copyText).toContain('thrill');
-
-      // Variation 2 should mention price
       expect(creatives[1].copyText).toContain('$');
-
-      // Variation 3 should mention experience
       expect(creatives[2].copyText).toContain('expert');
     });
 
@@ -152,7 +158,7 @@ describe('DAY 1: Ad Creative Generation', () => {
         where: { id: result.id },
       });
 
-      expect(campaign?.status).toBe('PENDING');
+      expect(campaign?.status).toBe('PENDING_APPROVAL');
       expect(campaign?.agencyId).toBe(mockAgencyId);
     });
 
@@ -164,7 +170,7 @@ describe('DAY 1: Ad Creative Generation', () => {
       });
 
       const targeting = campaign?.targetingParams as Record<string, unknown>;
-      expect((targeting.creativeVariations as Array<unknown>)).toHaveLength(3);
+      expect(targeting.creativeVariations as CreativeVariation[]).toHaveLength(3);
       expect(targeting.packageIds).toBeTruthy();
     });
 
@@ -215,7 +221,7 @@ describe('DAY 1: Ad Creative Generation', () => {
       creativeVariations.forEach((cv) => {
         expect(cv.variant).toBeTruthy();
         expect(cv.title).toBeTruthy();
-        expect(cv.copy).toBeTruthy();
+        expect(cv.copyText).toBeTruthy();
       });
     });
   });

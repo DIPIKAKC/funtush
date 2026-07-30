@@ -5,12 +5,12 @@ const router = Router();
 
 router.route('/agencies/me/coupons')
     .get(authenticateWithRefreshToken, getAgencyCoupons)
-    .post(createCoupon);
+    .post(authenticateWithRefreshToken, createCoupon);
 
 router.route('/agencies/me/coupons/:id')
-    .patch(updateCoupon);
+    .patch(authenticateWithRefreshToken, updateCoupon);
 
-router.route('bookings/inquiry/apply-coupon')
+router.route('/bookings/inquiry/apply-coupon')
     .patch(applyCoupon);
 
 export default router;

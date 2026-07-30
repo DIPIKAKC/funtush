@@ -106,6 +106,25 @@ enum CouponStatus {
   EXPIRED
 }
 
+/// What kind of number an `AgencyEmergencyContact` row holds.
+///
+/// The *national* emergency numbers (police / ambulance) are bundled in the app
+/// binary and looked up offline by country code — Backend Guide §10, SOS layer 1
+/// — so they are deliberately NOT stored here. These rows are the trek-specific
+/// numbers the app cannot know in advance.
+enum EmergencyContactType {
+  /// The agency's own 24/7 operations desk.
+  AGENCY_DESK
+  /// Helicopter / ground rescue operator contracted for this trek.
+  RESCUE
+  /// Nearest hospital or clinic on the route.
+  MEDICAL
+  /// Local liaison, lodge owner, or area coordinator.
+  LOCAL_CONTACT
+  /// Insurance assistance hotline.
+  INSURANCE
+}
+
 model SubscriptionTier {
   id           String  @id @default(uuid())
   name         String  @unique
@@ -151,6 +170,9 @@ model Agency {
   marketplaceClicks      MarketplaceClick[]
   coupons                Coupon[]
   branches               Branch[]
+
+  emergencyContacts AgencyEmergencyContact[]
+  guideProfiles     GuideProfile[]
 
   paymentMethods AgencyPaymentMethod[]
   accounts       Account[]
@@ -425,6 +447,12 @@ model TrekPackage {
 
   availableToAllBranches Boolean @default(true)
 
+  /// ISO 3166-1 alpha-2 country the trek physically takes place in ("NP", "IN").
+  /// The mobile app uses this to pick the right set of national emergency
+  /// numbers out of the offline database bundled in its binary (Backend Guide
+  /// §10, SOS layer 1), so it must travel inside the offline package.
+  countryCode String? @map("country_code")
+
   agency          Agency              @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   itineraries     TrekItinerary[]
   departureDates  TrekDepartureDate[]
@@ -432,6 +460,7 @@ model TrekPackage {
   destinations    TrekDestination[]
   bookings        Booking[]
   packageBranches PackageBranch[]
+  packingItems    TrekPackingItem[]
 
   @@index([agencyId])
   @@map("trek_packages")
@@ -466,6 +495,103 @@ model TrekItinerary {
   @@map("trek_itineraries")
 }
 
+/// One line on a trek's packing list.
+///
+/// Modelled as rows rather than a `Json` blob on `TrekPackage` because the
+/// agency dashboard needs to edit, reorder and reuse individual items, and
+/// Backend Guide §3 puts relational, editable data in Postgres. It is also what
+/// lets the offline package hash notice that a single item changed.
+model TrekPackingItem {
+  id        String @id @default(uuid())
+  packageId String @map("package_id")
+
+  /// Grouping header the app renders, e.g. "Clothing", "Gear", "Documents".
+  category    String
+  /// The thing to bring, e.g. "Down jacket (-20°C rated)".
+  item        String
+  /// Free text rather than a number: real lists say "2 pairs", "1–2 L".
+  quantity    String?
+  /// Essential items are rendered first and flagged — missing one can end a trek.
+  isEssential Boolean @default(false) @map("is_essential")
+  /// Manual ordering inside a category; ties fall back to `item` alphabetically.
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  package TrekPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId])
+  @@map("trek_packing_items")
+}
+
+/// A phone number the trekker may need in the field, owned by one agency.
+///
+/// Tenant-scoped (Backend Guide §4): these are the agency's own desk, rescue and
+/// medical contacts, never another agency's.
+model AgencyEmergencyContact {
+  id       String @id @default(uuid())
+  agencyId String @map("agency_id")
+
+  /// Human label shown next to the call button, e.g. "Ops desk (24/7)".
+  label String
+  /// Stored in full international form (+977…) so the phone can dial it offline
+  /// without knowing which country it is currently in.
+  phone String
+  type  EmergencyContactType
+
+  /// Optional second line, and an optional note ("ask for the duty manager").
+  altPhone String? @map("alt_phone")
+  notes    String?
+
+  /// Ordering in the app's emergency screen — lowest first.
+  sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@map("agency_emergency_contacts")
+}
+
+/// Contact details for a guide, so the offline package can carry them.
+///
+/// There is still no first-class `Guide` model, and `Booking.assignedGuideId` is
+/// a bare string with no foreign key that different code paths fill with a
+/// `User.id`, an `AgencyUser.id` or an `AgencyStaff.id` (see
+/// `resolveGuideIdentity` in `mobile.service.ts`). `guideRef` therefore mirrors
+/// that column as a plain string and is resolved in the service layer. When a
+/// real `Guide` model lands this becomes a normal relation.
+model GuideProfile {
+  id       String @id @default(uuid())
+  agencyId String @map("agency_id")
+  /// Matches whatever `Booking.assignedGuideId` holds for this guide.
+  guideRef String @map("guide_ref")
+
+  fullName       String   @map("full_name")
+  phone          String
+  altPhone       String?  @map("alt_phone")
+  /// Satellite phone — often the only number that works above the treeline.
+  satellitePhone String?  @map("satellite_phone")
+  /// Languages the guide speaks, e.g. ["en", "ne", "de"].
+  languages      String[] @default([])
+
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  /// One profile per guide per agency — the pair the service looks up by.
+  @@unique([agencyId, guideRef])
+  @@index([agencyId])
+  @@map("guide_profiles")
+}
+
 model TrekDepartureDate {
   id          String          @id @default(uuid())
   packageId   String          @map("package_id")
@@ -495,23 +621,39 @@ model TrekAddOn {
 }
 
 model Booking {
-  id               String            @id @default(uuid())
-  agencyId         String            @map("agency_id")
-  trekkerId        String?           @map("trekker_id")
-  packageId        String            @map("package_id")
-  branchId         String?           @map("branch_id")
-  departureDateId  String            @map("departure_date_id")
-  groupSize        Int               @map("group_size")
-  totalPrice       Decimal           @map("total_price") @db.Decimal(10, 2)
-  status           BookingStatus     @default(INQUIRY)
-  trekkerName      String            @map("trekker_name")
-  trekkerEmail     String            @map("trekker_email")
-  trekkerPhone     String            @map("trekker_phone")
-  trekkerCountry   String?           @map("trekker_country")
-  specialRequests  String?           @map("special_requests")
-  rejectionReason  String?           @map("rejection_reason")
-  proposedDate     DateTime?         @map("proposed_date") @db.Date
-  assignedGuideId  String?           @map("assigned_guide_id")
+  id              String        @id @default(uuid())
+  agencyId        String        @map("agency_id")
+  trekkerId       String?       @map("trekker_id")
+  packageId       String        @map("package_id")
+  branchId        String?       @map("branch_id")
+  departureDateId String        @map("departure_date_id")
+  groupSize       Int           @map("group_size")
+  totalPrice      Decimal       @map("total_price") @db.Decimal(10, 2)
+  status          BookingStatus @default(INQUIRY)
+  trekkerName     String        @map("trekker_name")
+  trekkerEmail    String        @map("trekker_email")
+  trekkerPhone    String        @map("trekker_phone")
+  trekkerCountry  String?       @map("trekker_country")
+  specialRequests String?       @map("special_requests")
+  rejectionReason String?       @map("rejection_reason")
+  proposedDate    DateTime?     @map("proposed_date") @db.Date
+  assignedGuideId String?       @map("assigned_guide_id")
+
+  /// ── Offline package versioning (Mobile week · Day 2) ──────────────────────
+  /// Monotonic counter the app compares against its cached copy. It starts at 1
+  /// and only ever moves up, so "my cached version < server version" is always a
+  /// safe test for "I must refetch".
+  offlinePackageVersion Int @default(1) @map("offline_package_version")
+
+  /// SHA-256 of the bundle's content. This is what makes the counter above
+  /// *correct*: the bundle is assembled from six different tables, so instead of
+  /// asking every writer to remember to bump a counter, we fingerprint the
+  /// content we just built and bump only when the fingerprint changed.
+  offlinePackageHash String? @map("offline_package_hash")
+
+  /// When the version last changed — surfaced to the app for display/debugging.
+  offlinePackageUpdatedAt DateTime? @map("offline_package_updated_at")
+
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
   agency           Agency            @relation(fields: [agencyId], references: [id])
@@ -559,23 +701,35 @@ model PaymentLink {
 }
 
 model AgencyProfile {
-  id                       String   @id @default(uuid())
-  agencyId                 String   @unique @map("agency_id")
-  logo                     String?
-  description              String?
-  address                  String?
-  phone                    Json?
-  email                    Json?
-  regions                  Json?
-  logoShowOnWebsite        Boolean  @default(true)
-  descriptionShowOnWebsite Boolean  @default(true)
-  phoneShowOnWebsite       Boolean  @default(true)
-  emailShowOnWebsite       Boolean  @default(true)
-  regionsShowOnWebsite     Boolean  @default(true)
-  addressShowOnWebsite     Boolean  @default(true)
-  createdAt                DateTime @default(now()) @map("created_at")
-  updatedAt                DateTime @updatedAt @map("updated_at")
-  agency                   Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  agencyId String @unique @map("agency_id")
+
+  logo        String?
+  description String?
+  address     String?
+  phone       Json?
+  email       Json?
+  regions     Json?
+
+  logoShowOnWebsite        Boolean @default(true)
+  descriptionShowOnWebsite Boolean @default(true)
+  phoneShowOnWebsite       Boolean @default(true)
+  emailShowOnWebsite       Boolean @default(true)
+  regionsShowOnWebsite     Boolean @default(true)
+  addressShowOnWebsite     Boolean @default(true)
+
+  //Communication widgets
+  whatsappEnabled Boolean @default(false)
+  whatsappNumber  String?
+
+  googleMapsEnabled Boolean @default(true)
+
+  liveChatEnabled Boolean @default(false)
+  liveChatCode    String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  agency    Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
 
   @@map("agency_profiles")
 }
@@ -837,8 +991,11 @@ model Payroll {
 }
 
 enum AdCampaignStatus {
+  DRAFT
   PENDING
+  PENDING_APPROVAL
   ACTIVE
+  APPROVED
   REJECTED
   PAUSED
 }
@@ -859,7 +1016,12 @@ model AdCampaign {
 
   metaCampaignId   String?
   googleCampaignId String?
+  googleSearchCampaignId String?
   rejectionReason  String?
+
+  performanceDaily AdPerformanceDaily[]
+
+  dailyBudgetCents Int @default(1000) @map("daily_budget_cents")
 
   createdAt  DateTime  @default(now())
   approvedAt DateTime?
@@ -869,6 +1031,28 @@ model AdCampaign {
 
   @@index([status])
   @@index([agencyId])
+}
+
+enum AdPlatform {
+  META
+  GOOGLE
+}
+
+model AdPerformanceDaily {
+  id          String     @id @default(cuid())
+  campaignId  String     @map("campaign_id")
+  campaign    AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  platform    AdPlatform
+  date        DateTime   @db.Date
+  impressions Int        @default(0)
+  clicks      Int        @default(0)
+  spend       Decimal    @default(0) @db.Decimal(12, 2)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@unique([campaignId, platform, date])
+  @@index([campaignId])
+  @@map("ad_performance_daily")
 }
 
 model MarketplaceImpression {

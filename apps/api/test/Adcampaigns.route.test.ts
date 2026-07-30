@@ -1,8 +1,16 @@
+vi.mock('../src/middleware/requireSuperAdminRole.middleware', () => ({
+  requireSuperAdminRole: (_req: any, _res: any, next: any) => next(),
+}));
+
+vi.mock('@funtush/auth', () => ({
+  requireAuth: (_req: any, _res: any, next: any) => next(),
+}));
+
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
 import express, { type Express } from "express";
 
-// ── Mock Prisma (same shim path the KYC test mocks) ──────────────────────────
+// ── Mock Prisma (same shim path the KYC test mocks) 
 vi.mock("../src/packages/database/prisma", () => ({
   prisma: {
     adCampaign: {
@@ -13,14 +21,14 @@ vi.mock("../src/packages/database/prisma", () => ({
   },
 }));
 
-// ── Mock ad platform adapter ─────────────────────────────────────────────────
+// ── Mock ad platform adapter
 vi.mock("../src/lib/adPlatforms", () => ({
   pushCampaignLive:      vi.fn(async () => ({ metaCampaignId: "meta_test", googleCampaignId: "ggl_test" })),
   pausePlatformCampaign: vi.fn(async () => {}),
   fetchCampaignMetrics:  vi.fn(async () => ({ impressions: 0, clicks: 0, spend: 0 })),
 }));
 
-// ── Mock emailQueue ──────────────────────────────────────────────────────────
+// ── Mock emailQueue 
 const queueEmailMock = vi.fn().mockResolvedValue("email_id_123");
 vi.mock("../src/lib/emailQueue", () => ({
   queueEmail: (...args: unknown[]) => queueEmailMock(...args),
@@ -55,7 +63,7 @@ describe("Ad campaign admin routes", () => {
 
   it("PATCH /:id/approve pushes live, marks ACTIVE, emails the agency", async () => {
     vi.mocked(prisma.adCampaign.findUnique).mockResolvedValue({
-      id: "c1", status: "PENDING", imageUrls: [], copyText: "x", targetingParams: {},
+      id: "c1", status: "PENDING_APPROVAL", imageUrls: [], copyText: "x", targetingParams: {},
       agency: { email: "a@b.com" },
     } as never);
     vi.mocked(prisma.adCampaign.update).mockImplementation(
@@ -93,7 +101,7 @@ describe("Ad campaign admin routes", () => {
 
   it("PATCH /:id/reject rejects with a reason and emails the agency", async () => {
     vi.mocked(prisma.adCampaign.findUnique).mockResolvedValue(
-      { id: "c1", status: "PENDING", agency: { email: "a@b.com" } } as never
+      { id: "c1", status: "PENDING_APPROVAL", agency: { email: "a@b.com" } } as never
     );
     vi.mocked(prisma.adCampaign.update).mockImplementation(
       (async ({ data }: { data: object }) => ({ id: "c1", ...data })) as never
