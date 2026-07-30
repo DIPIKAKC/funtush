@@ -503,15 +503,15 @@ model TrekPackingItem {
   packageId String @map("package_id")
 
   /// Grouping header the app renders, e.g. "Clothing", "Gear", "Documents".
-  category String
+  category    String
   /// The thing to bring, e.g. "Down jacket (-20°C rated)".
-  item String
+  item        String
   /// Free text rather than a number: real lists say "2 pairs", "1–2 L".
-  quantity String?
+  quantity    String?
   /// Essential items are rendered first and flagged — missing one can end a trek.
   isEssential Boolean @default(false) @map("is_essential")
   /// Manual ordering inside a category; ties fall back to `item` alphabetically.
-  sortOrder Int @default(0) @map("sort_order")
+  sortOrder   Int     @default(0) @map("sort_order")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -568,13 +568,13 @@ model GuideProfile {
   /// Matches whatever `Booking.assignedGuideId` holds for this guide.
   guideRef String @map("guide_ref")
 
-  fullName String  @map("full_name")
-  phone    String
-  altPhone String? @map("alt_phone")
+  fullName       String   @map("full_name")
+  phone          String
+  altPhone       String?  @map("alt_phone")
   /// Satellite phone — often the only number that works above the treeline.
-  satellitePhone String? @map("satellite_phone")
+  satellitePhone String?  @map("satellite_phone")
   /// Languages the guide speaks, e.g. ["en", "ne", "de"].
-  languages String[] @default([])
+  languages      String[] @default([])
 
   isActive Boolean @default(true) @map("is_active")
 
@@ -618,23 +618,23 @@ model TrekAddOn {
 }
 
 model Booking {
-  id               String            @id @default(uuid())
-  agencyId         String            @map("agency_id")
-  trekkerId        String?           @map("trekker_id")
-  packageId        String            @map("package_id")
-  branchId         String?           @map("branch_id")
-  departureDateId  String            @map("departure_date_id")
-  groupSize        Int               @map("group_size")
-  totalPrice       Decimal           @map("total_price") @db.Decimal(10, 2)
-  status           BookingStatus     @default(INQUIRY)
-  trekkerName      String            @map("trekker_name")
-  trekkerEmail     String            @map("trekker_email")
-  trekkerPhone     String            @map("trekker_phone")
-  trekkerCountry   String?           @map("trekker_country")
-  specialRequests  String?           @map("special_requests")
-  rejectionReason  String?           @map("rejection_reason")
-  proposedDate     DateTime?         @map("proposed_date") @db.Date
-  assignedGuideId  String?           @map("assigned_guide_id")
+  id              String        @id @default(uuid())
+  agencyId        String        @map("agency_id")
+  trekkerId       String?       @map("trekker_id")
+  packageId       String        @map("package_id")
+  branchId        String?       @map("branch_id")
+  departureDateId String        @map("departure_date_id")
+  groupSize       Int           @map("group_size")
+  totalPrice      Decimal       @map("total_price") @db.Decimal(10, 2)
+  status          BookingStatus @default(INQUIRY)
+  trekkerName     String        @map("trekker_name")
+  trekkerEmail    String        @map("trekker_email")
+  trekkerPhone    String        @map("trekker_phone")
+  trekkerCountry  String?       @map("trekker_country")
+  specialRequests String?       @map("special_requests")
+  rejectionReason String?       @map("rejection_reason")
+  proposedDate    DateTime?     @map("proposed_date") @db.Date
+  assignedGuideId String?       @map("assigned_guide_id")
 
   /// ── Offline package versioning (Mobile week · Day 2) ──────────────────────
   /// Monotonic counter the app compares against its cached copy. It starts at 1
@@ -697,23 +697,35 @@ model PaymentLink {
 }
 
 model AgencyProfile {
-  id                       String   @id @default(uuid())
-  agencyId                 String   @unique @map("agency_id")
-  logo                     String?
-  description              String?
-  address                  String?
-  phone                    Json?
-  email                    Json?
-  regions                  Json?
-  logoShowOnWebsite        Boolean  @default(true)
-  descriptionShowOnWebsite Boolean  @default(true)
-  phoneShowOnWebsite       Boolean  @default(true)
-  emailShowOnWebsite       Boolean  @default(true)
-  regionsShowOnWebsite     Boolean  @default(true)
-  addressShowOnWebsite     Boolean  @default(true)
-  createdAt                DateTime @default(now()) @map("created_at")
-  updatedAt                DateTime @updatedAt @map("updated_at")
-  agency                   Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  agencyId String @unique @map("agency_id")
+
+  logo        String?
+  description String?
+  address     String?
+  phone       Json?
+  email       Json?
+  regions     Json?
+
+  logoShowOnWebsite        Boolean @default(true)
+  descriptionShowOnWebsite Boolean @default(true)
+  phoneShowOnWebsite       Boolean @default(true)
+  emailShowOnWebsite       Boolean @default(true)
+  regionsShowOnWebsite     Boolean @default(true)
+  addressShowOnWebsite     Boolean @default(true)
+
+  //Communication widgets
+  whatsappEnabled Boolean @default(false)
+  whatsappNumber  String?
+
+  googleMapsEnabled Boolean @default(true)
+
+  liveChatEnabled Boolean @default(false)
+  liveChatCode    String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  agency    Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
 
   @@map("agency_profiles")
 }
