@@ -6,6 +6,9 @@ import bcrypt from "bcrypt";
 export const authenticateWithRefreshToken = async (req: Request, res: Response, next: NextFunction) => {
     try {
 
+        console.log("Authentication middleware called");
+        console.log(req.headers["x-refresh-token"]);
+
         const refreshToken = req.headers['x-refresh-token'] as string;
 
         if (!refreshToken) {
@@ -22,11 +25,13 @@ export const authenticateWithRefreshToken = async (req: Request, res: Response, 
 
             if (isValid) {
                 // Look up the user by userId from token
+
                 const agencyUser = await db.agencyUser.findFirst({
                     where: {
                         userId: t.userId,
                     },
                 });
+                console.log("Agency user:", agencyUser);
 
                 if (!agencyUser) {
                     return res.status(401).json({ message: "User not found" });
@@ -44,6 +49,10 @@ export const authenticateWithRefreshToken = async (req: Request, res: Response, 
                 if (!agencyUser.agencyId) {
                     return res.status(401).json({ message: "Agency not linked" });
                 }
+
+                console.log("Setting agencyId:", agencyUser.agencyId);
+                console.log("Calling next()");
+                
 
                 return next();
             }

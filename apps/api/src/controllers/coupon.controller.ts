@@ -6,6 +6,7 @@ export const createCoupon = async (
     res: Response
 ) => {
     try {
+        console.log("agency id coupon",req.agencyId)
         const agencyId = req.agencyId as string;
 
         const coupon = await createCouponService(
@@ -90,16 +91,7 @@ export const applyCoupon = async (
     res: Response
 ) => {
     try {
-
-        // const {
-        //     agencyId,
-        //     couponCode,
-        //     packageId,
-        //     bookingValue,
-        //     groupSize,
-        //     trekkerEmail,
-        // } = req.body;
-
+        
         const coupon = await validateAndApplyCoupon(
             req.body
         );

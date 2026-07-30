@@ -1,26 +1,27 @@
-/**
- * Ad platform adapters — Meta (Facebook) Marketing API + Google Ads API.
- *
- * These are STUBS so the admin queue works end-to-end in dev without live
- * credentials. They simulate pushing a creative live, pausing it, and reading
- * back delivery metrics. Swap the bodies for real SDK calls when you have keys:
- *   - Meta:   facebook-nodejs-business-sdk   (Marketing API)
- *   - Google: google-ads-api                 (Google Ads API)
- *
- * Lives alongside emailQueue.ts under src/lib/.
- */
+import {
+  createMetaCampaign,
+  pauseMetaCampaign,
+  fetchMetaCampaignMetrics,
+  type CampaignForMeta,
+} from "../services/metaAdsService";
 
-import { randomUUID } from "crypto";
+import {
+  createGoogleCampaign,
+  createGoogleSearchCampaign,
+  pauseGoogleCampaign,
+  fetchGoogleCampaignMetrics,
+  type CampaignForGoogle,
+} from "../services/googleAdsService";
+
+import type { TargetingParams } from "../services/targetingBuilderService";
 
 export interface CampaignCreative {
+  campaignId: string;
+  agencyName: string;
   imageUrls: string[];
   copyText: string;
+  dailyBudgetCents: number;
   targetingParams: unknown;
-}
-
-export interface PlatformIds {
-  metaCampaignId: string;
-  googleCampaignId: string;
 }
 
 export interface CampaignMetrics {
@@ -29,41 +30,132 @@ export interface CampaignMetrics {
   spend: number;
 }
 
-/**
- * Push a creative live on both Meta and Google. Returns the external campaign
- * IDs so we can pause / report on them later.
- */
+export interface PlatformMetricsBreakdown {
+  meta: CampaignMetrics;
+  google: CampaignMetrics;
+}
+
+export interface PlatformIds {
+  metaCampaignId: string | null;
+  googleCampaignId: string | null;
+  googleSearchCampaignId: string | null;
+}
+
 export async function pushCampaignLive(
   creative: CampaignCreative
 ): Promise<PlatformIds> {
-  // TODO: real Meta Marketing API call — create Campaign -> AdSet -> Ad
-  // TODO: real Google Ads API call     — create Campaign -> AdGroup -> Ad
-  void creative;
+  const metaResult = await createMetaCampaign({
+    id: creative.campaignId,
+    copyText: creative.copyText,
+    imageUrls: creative.imageUrls,
+    dailyBudgetCents: creative.dailyBudgetCents,
+    targetingParams: creative.targetingParams as TargetingParams,
+    agencyName: creative.agencyName,
+  } satisfies CampaignForMeta);
+
+  let googleCampaignId: string | null = null;
+  let googleSearchCampaignId: string | null = null;
+
+  try {
+    const googleResult = await createGoogleCampaign({
+      id: creative.campaignId,
+      copyText: creative.copyText,
+      dailyBudgetCents: creative.dailyBudgetCents,
+      targetingParams: creative.targetingParams as TargetingParams,
+      agencyName: creative.agencyName,
+    } satisfies CampaignForGoogle);
+
+    googleCampaignId = googleResult.googleCampaignId;
+  } catch (err) {
+    console.warn(
+      `[adPlatforms] Google Display push-live skipped/failed for campaign ${creative.campaignId}:`,
+      err instanceof Error ? err.message : err
+    );
+  }
+
+  try {
+    const googleSearchResult = await createGoogleSearchCampaign({
+      id: creative.campaignId,
+      copyText: creative.copyText,
+      dailyBudgetCents: creative.dailyBudgetCents,
+      targetingParams: creative.targetingParams as TargetingParams,
+      agencyName: creative.agencyName,
+    } satisfies CampaignForGoogle);
+
+    googleSearchCampaignId = googleSearchResult.googleSearchCampaignId;
+  } catch (err) {
+    console.warn(
+      `[adPlatforms] Google Search push-live skipped/failed for campaign ${creative.campaignId}:`,
+      err instanceof Error ? err.message : err
+    );
+  }
+
   return {
-    metaCampaignId: `meta_${randomUUID()}`,
-    googleCampaignId: `ggl_${randomUUID()}`,
+    metaCampaignId: metaResult.metaCampaignId,
+    googleCampaignId,
+    googleSearchCampaignId,
   };
 }
 
-/**
- * Pause a live campaign on both platforms. Should be idempotent — pausing an
- * already-paused campaign must not throw.
- */
-export async function pausePlatformCampaign(ids: PlatformIds): Promise<void> {
-  // TODO: Meta   — POST /{campaign-id} { status: "PAUSED" }
-  // TODO: Google — campaignOperations.update status = PAUSED
-  void ids;
+export async function pausePlatformCampaign(
+  ids: PlatformIds
+): Promise<void> {
+  if (ids.metaCampaignId) {
+    await pauseMetaCampaign(ids.metaCampaignId);
+  }
+
+  if (ids.googleCampaignId) {
+    try {
+      await pauseGoogleCampaign(ids.googleCampaignId);
+    } catch (err) {
+      console.error(
+        `[adPlatforms] Failed to pause Google Display campaign ${ids.googleCampaignId}:`,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  if (ids.googleSearchCampaignId) {
+    try {
+      await pauseGoogleCampaign(ids.googleSearchCampaignId);
+    } catch (err) {
+      console.error(
+        `[adPlatforms] Failed to pause Google Search campaign ${ids.googleSearchCampaignId}:`,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
 }
 
-/**
- * Fetch fresh delivery metrics for a live campaign. In production this hits the
- * insights endpoints; here it returns zeros for the caller to merge in.
- */
 export async function fetchCampaignMetrics(
-  ids: PlatformIds
-): Promise<CampaignMetrics> {
-  // TODO: Meta   — GET /{campaign-id}/insights (impressions, clicks, spend)
-  // TODO: Google — searchStream metrics.impressions, clicks, cost_micros
-  void ids;
-  return { impressions: 0, clicks: 0, spend: 0 };
+  ids: PlatformIds,
+  date: string
+): Promise<PlatformMetricsBreakdown> {
+  const meta = ids.metaCampaignId
+    ? await fetchMetaCampaignMetrics(ids.metaCampaignId, date)
+    : { impressions: 0, clicks: 0, spend: 0 };
+
+  const googleDisplay =
+    ids.googleCampaignId
+      ? await fetchGoogleCampaignMetrics(ids.googleCampaignId, date)
+      : { impressions: 0, clicks: 0, spend: 0 };
+
+  const googleSearch =
+    ids.googleSearchCampaignId
+      ? await fetchGoogleCampaignMetrics(ids.googleSearchCampaignId, date)
+      : { impressions: 0, clicks: 0, spend: 0 };
+
+  const google = {
+    impressions:
+      googleDisplay.impressions + googleSearch.impressions,
+    clicks:
+      googleDisplay.clicks + googleSearch.clicks,
+    spend:
+      googleDisplay.spend + googleSearch.spend,
+  };
+
+  return {
+    meta,
+    google,
+  };
 }
