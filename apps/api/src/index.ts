@@ -21,12 +21,13 @@ import adminRoutes from "./routes/admin/index.js";
 import agencyAnalyticsRoutes from "./routes/agencyAnalytics.routes.js";
 import fraudRouter from "./routes/admin/fraud.route.js";
 
-// NEW: Email & SOS Routes
+// Email & SOS Routes
 import emailRoutes from "./routes/emailRoutes.js";
 import sosRoutes from "./routes/sosRoutes.js";
 
 import { startVisibilityScoreCron } from "./jobs/visibilityScore.job.js";
 import { startSubscriptionCron } from "./jobs/subscriptionExpiry.job.js";
+import { startAdPerformanceSyncJob } from "./jobs/syncAdPerformance.job.js";
 import { configureIndexes } from "./services/search.service.js";
 import {
   initNotificationService,
@@ -66,7 +67,7 @@ app.use("/", agencyAnalyticsRoutes);
 
 app.use("/", financeRoutes);
 
-// NEW: Email & SOS Routes
+// Email & SOS Routes
 app.use("/emails", emailRoutes);
 app.use("/sos", sosRoutes);
 
@@ -114,6 +115,7 @@ if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
 
   startSubscriptionCron();
   startVisibilityScoreCron();
+  startAdPerformanceSyncJob();
 
   // Ensure Meilisearch indexes + settings exist on boot (idempotent, non-blocking).
   configureIndexes().catch(console.error);
