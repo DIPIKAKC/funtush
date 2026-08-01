@@ -132,12 +132,13 @@ export const instagramCallbackController = async (
             message: "Instagram connected successfully."
         });
 
-    } catch (error: any) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message:
-                error.response?.data?.error?.message ??
-                "Instagram OAuth failed."
+                err instanceof Error
+                    ? err.message
+                    : "Instagram OAuth failed."
         });
 
     }

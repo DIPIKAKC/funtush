@@ -733,7 +733,7 @@ model AgencyProfile {
   instagramFeedEnabled Boolean @default(false) @map("instagram_feed_enabled")
   instagramBusinessId String? @map("instagram_business_id")
   instagramAccessToken String? @map("instagram_access_token") @db.Text
-  instagramTokenExpiresAt DateTime @map("instagram_token_expires_at")
+  instagramTokenExpiresAt DateTime? @map("instagram_token_expires_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
