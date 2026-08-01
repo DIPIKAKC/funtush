@@ -14,7 +14,8 @@ import mobileRoutes from "./routes/mobile.routes.js";
 import reviewRoutes from "./routes/review.route.js";
 import couponRoutes from "./routes/coupon.route.js";
 import branchRoutes from "./routes/branches.routes.js";
-import widgetsRoutes from "./routes/widgets.routes.js";
+import widgetsRoutes from "./routes/widgets/widgets.routes.js";
+import instagramRoutes from "./routes/widgets/instagram.routes.js";
 import financeRoutes from "./routes/finance.route.js";
 import staffRoutes from "./routes/staff.routes";
 import adminRoutes from "./routes/admin/index.js";
@@ -49,6 +50,7 @@ app.use("/", reviewRoutes);
 app.use("/", couponRoutes);
 app.use("/", branchRoutes);
 app.use("/", widgetsRoutes);
+app.use("/", instagramRoutes);
 
 
 app.use("/", trekkerRoutes);
