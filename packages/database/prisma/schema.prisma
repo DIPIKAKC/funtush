@@ -722,6 +722,7 @@ model AgencyProfile {
 
   liveChatEnabled Boolean @default(false)
   liveChatCode    String? @db.Text
+  //
 
   // Marketing Widgets
 
@@ -734,6 +735,11 @@ model AgencyProfile {
   instagramBusinessId String? @map("instagram_business_id")
   instagramAccessToken String? @map("instagram_access_token") @db.Text
   instagramTokenExpiresAt DateTime? @map("instagram_token_expires_at")
+
+  currencyConverterEnabled Boolean @default(false) @map("currency_converter_enabled")
+  
+  weatherWidgetEnabled Boolean @default(false) @map("weather_enabled")
+  //
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
