@@ -723,6 +723,18 @@ model AgencyProfile {
   liveChatEnabled Boolean @default(false)
   liveChatCode    String? @db.Text
 
+  // Marketing Widgets
+
+  googleAnalyticsId String? @map("google_analytics_id")
+
+  facebookPixelId String? @map("facebook_pixel_id")
+
+  instagramConnected Boolean @default(false) @map("instagram_connected")
+  instagramFeedEnabled Boolean @default(false) @map("instagram_feed_enabled")
+  instagramBusinessId String? @map("instagram_business_id")
+  instagramAccessToken String? @map("instagram_access_token") @db.Text
+  instagramTokenExpiresAt DateTime @map("instagram_token_expires_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   agency    Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
