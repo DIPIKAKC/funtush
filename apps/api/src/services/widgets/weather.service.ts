@@ -59,6 +59,7 @@ export const updateWeatherWidgetService = async (
         },
     });
 };
+
 export const weatherApiService = async (
     data: WeatherPayload
 ) => {
@@ -106,16 +107,16 @@ export const weatherApiService = async (
             visibility: currentWeather.data.visibility,
             windSpeed: currentWeather.data.wind.speed,
         },
-        forecast: forecastWeather.data.list.slice(0, 5).map(
-            (item: any) => ({
-                date: item.dt_txt,
-                weather: item.weather[0].description,
-                temperature: item.main.temp,
-                feelsLike: item.main.feels_like,
-                humidity: item.main.humidity,
-                windSpeed: item.wind.speed,
-            })
-        ),
+        // forecast: forecastWeather.data.list.slice(0, 5).map(
+        //     (item: any) => ({
+        //         date: item.dt_txt,
+        //         weather: item.weather[0].description,
+        //         temperature: item.main.temp,
+        //         feelsLike: item.main.feels_like,
+        //         humidity: item.main.humidity,
+        //         windSpeed: item.wind.speed,
+        //     })
+        // ),
     };
 
 };
