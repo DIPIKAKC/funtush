@@ -745,7 +745,7 @@ model AgencyProfile {
 
   //YouTube Embeds
   youtubeEnabled   Boolean @default(false)
-  youtubeVideos    String[]? @default([]) 
+  youtubeVideos    String[] @default([]) 
   maxYoutubeVideos Int? @default(10)
   //
 
