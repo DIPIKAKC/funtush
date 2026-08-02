@@ -735,10 +735,18 @@ model AgencyProfile {
   instagramBusinessId String? @map("instagram_business_id")
   instagramAccessToken String? @map("instagram_access_token") @db.Text
   instagramTokenExpiresAt DateTime? @map("instagram_token_expires_at")
+  //
 
+  //Utility Widgets
   currencyConverterEnabled Boolean @default(false) @map("currency_converter_enabled")
   
   weatherWidgetEnabled Boolean @default(false) @map("weather_enabled")
+  //
+
+  //YouTube Embeds
+  youtubeEnabled   Boolean @default(false)
+  youtubeVideos    String[]? @default([]) 
+  maxYoutubeVideos Int? @default(10)
   //
 
   createdAt DateTime @default(now()) @map("created_at")
