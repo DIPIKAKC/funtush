@@ -11,7 +11,7 @@ import { syncAndGetCampaignPerformance } from '../../services/adPerformanceServi
 // approve/reject/pause/performance logic, not real Meta/Google API calls.
 vi.mock('../../lib/adPlatforms', () => ({
   pushCampaignLive: vi.fn(),
-  pausePlatformCampaign: vi.fn(async () => {}),
+  pausePlatformCampaign: vi.fn(async () => { }),
   fetchCampaignMetrics: vi.fn(),
 }));
 
@@ -80,6 +80,7 @@ describe('DAY 4: Google Ads Integration & Performance Sync', () => {
       vi.mocked(pushCampaignLive).mockResolvedValueOnce({
         metaCampaignId: 'meta_123',
         googleCampaignId: 'google_456',
+        googleSearchCampaignId: null,
       });
 
       const campaign = await createPendingCampaign();
@@ -95,6 +96,7 @@ describe('DAY 4: Google Ads Integration & Performance Sync', () => {
       vi.mocked(pushCampaignLive).mockResolvedValueOnce({
         metaCampaignId: 'meta_789',
         googleCampaignId: null,
+        googleSearchCampaignId: null,
       });
 
       const campaign = await createPendingCampaign();
