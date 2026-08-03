@@ -47,6 +47,17 @@ const getTrekkerDashboard = vi.fn();
 const getGuideDashboard = vi.fn();
 const buildOfflinePackage = vi.fn();
 const getOfflinePackageVersion = vi.fn();
+const registerDeviceToken = vi.fn();
+const unregisterDeviceToken = vi.fn();
+
+vi.mock("../services/deviceToken.service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../services/deviceToken.service")>();
+  return {
+    ...actual,
+    registerDeviceToken: (...a: unknown[]) => registerDeviceToken(...a),
+    unregisterDeviceToken: (...a: unknown[]) => unregisterDeviceToken(...a),
+  };
+});
 
 vi.mock("../services/offlinePackage.service", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../services/offlinePackage.service")>();
@@ -134,6 +145,15 @@ beforeEach(() => {
     contentUpdatedAt: "2026-07-28T09:30:00.000Z",
     status: "PAID",
   });
+  registerDeviceToken.mockResolvedValue({
+    deviceId: "device-1",
+    platform: "ANDROID",
+    tokenPreview: "…z1b2c3",
+    lastActiveAt: "2026-08-03T09:00:00.000Z",
+    created: true,
+    deviceCount: 1,
+  });
+  unregisterDeviceToken.mockResolvedValue({ removed: 1, deviceCount: 0 });
 });
 
 describe("GET /mobile/trekker/dashboard", () => {
@@ -378,8 +398,154 @@ describe("GET /mobile/bookings/:id/offline-package/version", () => {
   });
 });
 
+describe("POST /mobile/register-device", () => {
+  const url = () => `${baseUrl}/mobile/register-device`;
+  const TOKEN = `fMEP0vJqS0${"a".repeat(140)}z1b2c3`;
+
+  const post = (body: unknown, init: RequestInit = {}) =>
+    fetch(url(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      ...init,
+    });
+
+  it("401s without a token", async () => {
+    const res = await post({ fcmToken: TOKEN, platform: "android" });
+    expect(res.status).toBe(401);
+    expect(registerDeviceToken).not.toHaveBeenCalled();
+  });
+
+  it("201s the first registration of a device", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+
+    const res = await post({ fcmToken: TOKEN, platform: "android" });
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(res.status).toBe(201);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(body.deviceId).toBe("device-1");
+    expect(body.tokenPreview).toBe("…z1b2c3");
+  });
+
+  it("200s a refresh of an already-known device", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+    registerDeviceToken.mockResolvedValue({
+      deviceId: "device-1",
+      platform: "ANDROID",
+      tokenPreview: "…z1b2c3",
+      lastActiveAt: "2026-08-03T09:00:00.000Z",
+      created: false,
+      deviceCount: 2,
+    });
+
+    const res = await post({ fcmToken: TOKEN, platform: "android" });
+    expect(res.status).toBe(200);
+  });
+
+  it("takes the user id from the token and ignores one in the body", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+
+    await post({ fcmToken: TOKEN, platform: "android", userId: "someone-else" });
+
+    expect(registerDeviceToken.mock.calls[0]![0]).toEqual({
+      userId: "user-1",
+      fcmToken: TOKEN,
+      platform: "android",
+    });
+  });
+
+  it("is open to every authenticated role — a guide needs push as much as a trekker", async () => {
+    authState.user = {
+      userId: "user-7",
+      role: "GUIDE",
+      roleType: "TENANT",
+      agencyId: "agency-1",
+    };
+
+    const res = await post({ fcmToken: TOKEN, platform: "ios" });
+    expect(res.status).toBe(201);
+  });
+
+  it("maps a service 400 onto the HTTP response", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+    registerDeviceToken.mockRejectedValue(
+      Object.assign(new Error("platform must be one of: ANDROID, IOS, WEB"), { status: 400 })
+    );
+
+    const res = await post({ fcmToken: TOKEN, platform: "symbian" });
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toContain("ANDROID");
+  });
+});
+
+describe("DELETE /mobile/register-device", () => {
+  const url = (suffix = "") => `${baseUrl}/mobile/register-device${suffix}`;
+  const TOKEN = `fMEP0vJqS0${"a".repeat(140)}z1b2c3`;
+
+  it("401s without a token", async () => {
+    const res = await fetch(url(), { method: "DELETE" });
+    expect(res.status).toBe(401);
+    expect(unregisterDeviceToken).not.toHaveBeenCalled();
+  });
+
+  it("unregisters from a JSON body", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+
+    const res = await fetch(url(), {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fcmToken: TOKEN }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await res.json()).toEqual({ removed: 1, deviceCount: 0 });
+    expect(unregisterDeviceToken.mock.calls[0]![0]).toEqual({
+      userId: "user-1",
+      fcmToken: TOKEN,
+    });
+  });
+
+  it("also accepts the token as a query parameter, for clients that drop DELETE bodies", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+
+    const res = await fetch(url(`?fcmToken=${TOKEN}`), { method: "DELETE" });
+
+    expect(res.status).toBe(200);
+    expect(unregisterDeviceToken.mock.calls[0]![0]).toEqual({
+      userId: "user-1",
+      fcmToken: TOKEN,
+    });
+  });
+
+  it("still returns 200 when the token was already gone", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+    unregisterDeviceToken.mockResolvedValue({ removed: 0, deviceCount: 0 });
+
+    const res = await fetch(url(`?fcmToken=${TOKEN}`), { method: "DELETE" });
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { removed: number }).removed).toBe(0);
+  });
+
+  it("maps a service 400 onto the HTTP response when no token was supplied", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+    unregisterDeviceToken.mockRejectedValue(
+      Object.assign(new Error("fcmToken is required to unregister a device"), { status: 400 })
+    );
+
+    const res = await fetch(url(), { method: "DELETE" });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("route guards", () => {
   it("locks each route to the roles that own it", () => {
+    // Four entries, not six: the two device routes carry `requireAuth` only.
+    // Registering your own phone for push is not an agency-data question, so
+    // there is no role dimension to guard — see the comment in mobile.routes.ts.
     expect(guardedRoles).toEqual([
       ["TREKKER"],
       ["GUIDE", "STAFF"],

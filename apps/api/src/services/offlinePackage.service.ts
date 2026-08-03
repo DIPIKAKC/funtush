@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { db } from "@funtush/database";
 import type { BookingStatus, Prisma } from "@funtush/database";
 import { resolveGuideIdentity, toDateOnly, startOfUtcDay, trekEndDate, toNumber } from "./mobile.service";
+import { httpError } from "../utils/httpError";
 
 /**
  * ── Offline itinerary caching contract (Mobile week · Day 2) ─────────────────
@@ -69,21 +70,13 @@ export const AGENCY_WIDE_ROLES: readonly string[] = ["AGENCY_ADMIN", "AGENCY_MOD
 
 /* ── Errors ──────────────────────────────────────────────────────────────── */
 
-/** An `Error` that also carries the HTTP status the controller should send. */
-export interface HttpError extends Error {
-  status: number;
-}
-
 /**
- * Build an error the controller can turn straight into a response.
- * Keeping status codes next to the rule that produced them means the controller
- * never has to guess why something failed.
+ * `httpError` used to be defined here. It moved to `utils/httpError.ts` on Day 3
+ * when the device-token service needed the same helper; re-exporting keeps every
+ * existing `import { httpError } from "./offlinePackage.service"` working.
  */
-export function httpError(status: number, message: string): HttpError {
-  const error = new Error(message) as HttpError;
-  error.status = status;
-  return error;
-}
+export { httpError };
+export type { HttpError } from "../utils/httpError";
 
 /* ── Actor ───────────────────────────────────────────────────────────────── */
 
