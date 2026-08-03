@@ -238,3 +238,98 @@ export const facebookPixelWidgetService = async (
     return profile;
 };
 
+export const getWidgetsService = async (
+    agencyUserId: string
+) => {
+
+    const agencyUser = await db.agencyUser.findUnique({
+        where: {
+            id: agencyUserId,
+        },
+        select: {
+            agencyId: true,
+        },
+    });
+
+    if (!agencyUser) {
+        throw new Error("Agency user not found.");
+    }
+
+    const profile = await db.agencyProfile.findUnique({
+        where: {
+            agencyId: agencyUser.agencyId,
+        },
+        select: {
+            whatsappEnabled: true,
+            whatsappNumber: true,
+
+            googleMapsEnabled: true,
+
+            liveChatEnabled: true,
+            liveChatCode: true,
+
+            googleAnalyticsId: true,
+
+            facebookPixelId: true,
+
+            instagramConnected: true,
+            instagramFeedEnabled: true,
+
+            currencyConverterEnabled: true,
+            
+            weatherWidgetEnabled: true,
+
+            youtubeEnabled: true,
+            youtubeVideos: true,
+            maxYoutubeVideos: true,
+        },
+    });
+
+    if (!profile) {
+        throw new Error("Agency profile not found.");
+    }
+
+    return {
+        whatsapp: {
+            enabled: profile.whatsappEnabled,
+            number: profile.whatsappNumber,
+        },
+
+        googleMaps: {
+            enabled: profile.googleMapsEnabled,
+        },
+
+        liveChat: {
+            enabled: profile.liveChatEnabled,
+            code: profile.liveChatCode,
+        },
+
+        weather: {
+            enabled: profile.weatherWidgetEnabled,
+        },
+
+        currencyConverter: {
+            enabled: profile.currencyConverterEnabled,
+        },
+
+        youtube: {
+            enabled: profile.youtubeEnabled,
+            videos: profile.youtubeVideos,
+            maxVideos: profile.maxYoutubeVideos,
+        },
+
+        googleAnalytics: {
+            id: profile.googleAnalyticsId,
+        },
+
+        facebookPixel: {
+            id: profile.facebookPixelId,
+        },
+
+        instagram: {
+            connected: profile.instagramConnected,
+            feedEnabled: profile.instagramFeedEnabled,
+        },
+    };
+};
+
