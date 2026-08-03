@@ -1,4 +1,5 @@
 import { prisma } from "../packages/database/prisma";
+import { BugStatus } from "@funtush/database";
 
 export async function submitBug(
   agencyId: string,
@@ -32,7 +33,7 @@ export async function getAgencyBugs(
 ) {
   const where = {
     agencyId,
-    ...(status ? { status: status as any } : {}),
+    ...(status && isValidBugStatus(status) ? { status } : {}),
   };
 
   const [items, total] = await Promise.all([
@@ -46,4 +47,8 @@ export async function getAgencyBugs(
   ]);
 
   return { items, total, page, limit };
+}
+
+function isValidBugStatus(value: string): value is BugStatus {
+  return Object.values(BugStatus).includes(value as BugStatus);
 }
