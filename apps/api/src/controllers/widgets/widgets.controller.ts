@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { facebookPixelWidgetService, googleAnalyticsWidgetService, livechatWidgetService, whatsappWidgetService } from "src/services/widgets/widgets.service";
+import { facebookPixelWidgetService, getWidgetsService, googleAnalyticsWidgetService, livechatWidgetService, whatsappWidgetService } from "src/services/widgets/widgets.service";
 
 export const whatsappWidgetController = async (
     req: Request,
@@ -109,3 +109,27 @@ export const facebookPixelWidgetController = async (
     }
 };
 
+export const getWidgetsController = async (
+    req: Request,
+    res: Response
+) => {
+    try {
+        const agencyUserId = req.tenantId as string;
+
+        const widgets = await getWidgetsService(agencyUserId);
+
+        return res.status(200).json({
+            success: true,
+            message: "Widgets retrieved successfully.",
+            data: widgets,
+        });
+    } catch (err) {
+        return res.status(400).json({
+            success: false,
+            message:
+                err instanceof Error
+                    ? err.message
+                    : "Failed to retrieve widgets.",
+        });
+    }
+};
