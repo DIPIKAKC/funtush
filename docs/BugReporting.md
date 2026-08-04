@@ -1,107 +1,210 @@
 ## Bug Reporting Flow
 
-### Overview
+# DAY 1 — Bug Reporting
 
-Implemented the Bug Reporting module, allowing agencies to submit platform bug reports (with optional screenshots) and view their own paginated bug history. All reports are stored in the REPORTED state and are isolated per agency to ensure tenant security.
+## Overview
 
+Implemented the Bug Reporting module, allowing agencies to submit platform bug reports (with optional screenshots) and view their own paginated bug history. All reports are stored in the `REPORTED` state and are isolated per agency to ensure tenant security.
 
-### 1. Bug Submission Flow
+## 1. Bug Submission
 
-#### 1.1 Submit Bug
+### 1.1 Submit Bug
+
 **`POST /agencies/me/bugs`**
 
-Agency submits `title`, `description`, optional `stepsToReproduce`, and optional `screenshotUrl`.
+Agency admins can submit bug reports by providing a title, description, optional reproduction steps, and an optional screenshot URL.
 
-**Validation**
+#### Validation
 - `title` must be a non-empty string after trimming
 - `description` must be a non-empty string after trimming
 
-**Processing**
-- Input strings are trimmed before persisting
-- New `BugReport` row created with `status: REPORTED`
-- `priority` and `resolutionNote` are left unset at creation — these are set later by Super Admin (Day 2 scope)
-- Screenshot upload itself is handled by the existing generic `POST /upload` endpoint; the client uploads first and passes the returned URL in as `screenshotUrl`
+#### Processing
+- Trims input before persisting
+- Creates a new `BugReport` with `status: REPORTED`
+- Leaves `priority` and `resolutionNote` unset
+- Uses the existing `POST /upload` endpoint for screenshot uploads
 
 #### Implementation
-- `apps/api/src/services/bugReport.service.ts` → `submitBug`, `getAgencyBugs`
-- `apps/api/src/controllers/bugReport.controller.ts` → `submitBugController`, `getAgencyBugsController`
+- `apps/api/src/services/bugReport.service.ts` → `submitBug`
+- `apps/api/src/controllers/bugReport.controller.ts` → `submitBugController`
 - `apps/api/src/routes/bug.routes.ts`
 
+## 2. Bug History & Tracking
 
-### 2. Bug History & Tracking
+### 2.1 List Agency Bugs
 
-#### 2.1 List Agency Bugs
 **`GET /agencies/me/bugs?status={REPORTED|IN_PROGRESS|RESOLVED}&page=&limit=`**
 
-Agency admin — paginated list of the agency's own bug reports, optionally filtered by status, newest first.
+Returns a paginated list of the authenticated agency's bug reports, optionally filtered by status and ordered newest first.
 
-**Tenant Isolation**
-- Query is always scoped to `agencyId` pulled from the authenticated JWT (`req.user.agencyId`)
-- An agency can never see another agency's bug reports, per platform-wide tenant isolation rules
+#### Tenant Isolation
+- Queries are always scoped to `req.user.agencyId`
+- Agencies can only access their own bug reports
 
 #### Implementation
 - `apps/api/src/services/bugReport.service.ts` → `getAgencyBugs`
+- `apps/api/src/controllers/bugReport.controller.ts` → `getAgencyBugsController`
 
+## 3. Data Model
 
-### 3. Data Model
+### Models
+- `BugReport`
 
-`BugReport`:
+### Migration
+- `20260803111737_add_bug_report`
 
-| Field | Type | Notes |
-|---|---|---|
-| `id` | String (cuid) | Primary key |
-| `agencyId` | String | Foreign key → `Agency`, tenant scope |
-| `title` | String | Required |
-| `description` | String | Required |
-| `stepsToReproduce` | String? | Optional |
-| `screenshotUrl` | String? | Optional, set via existing upload endpoint |
-| `status` | `BugStatus` | `REPORTED` (default) → `IN_PROGRESS` → `RESOLVED` |
-| `priority` | `BugPriority`? | Null at creation; set by Super Admin (Day 2) |
-| `resolutionNote` | String? | Set by Super Admin on resolution (Day 2) |
-| `createdAt` / `updatedAt` | DateTime | Standard timestamps |
+## 4. Testing Summary
 
-Migration: `packages/database/prisma/migrations/20260803111737_add_bug_report/`
+**Test file**
+- `apps/api/src/test/bugReporting/bugReport.test.ts`
 
+**Covered Tests**
+- Bug submission
+- Input validation
+- Tenant isolation
+- Pagination and status filtering
 
-### 4. Testing Summary
+**Result**
+-  Passed
 
-| Method | URL / Function | What Was Tested | Outcome |
-|---|---|---|---|
-| — | `submitBug()` | Creates bug report with `status: REPORTED`, `priority`/`resolutionNote` null | Pass |
-| — | `submitBug()` | Stores optional `screenshotUrl` when provided | Pass |
-| — | `submitBug()` | Rejects empty `title` | Pass |
-| — | `submitBug()` | Rejects empty `description` | Pass |
-| — | `submitBug()` | Trims whitespace from `title` and `description` | Pass |
-| — | `getAgencyBugs()` | Tenant isolation — never returns another agency's bugs | Pass |
-| — | `getAgencyBugs()` | Returns bugs ordered newest first | Pass |
-| — | `getAgencyBugs()` | Pagination returns correct, non-overlapping pages | Pass |
-| — | `getAgencyBugs()` | Filters correctly by `status` | Pass |
-| — | `getAgencyBugs()` | Returns empty list for an agency with no bugs | Pass |
-| `POST` | `/agencies/me/bugs` | Full HTTP route through `requireAuth` + `requireRole` middleware | **Pending manual verification** |
-| `GET` | `/agencies/me/bugs` | Full HTTP route through `requireAuth` + `requireRole` middleware | **Pending manual verification** |
+# DAY 2 — Bug Workflow & Hints
 
-> **Note:** All service-layer logic (creation, validation, tenant isolation, pagination, filtering) is covered by automated tests — 10/10 passing. The two HTTP-level rows above have not yet been exercised by an automated or manual request through the actual Express route; this is the one remaining check before Day 1 is fully closed out.
+## Overview
 
-Test file: `apps/api/src/test/bugReporting/bugReport.test.ts`
+Implemented the complete bug lifecycle for platform staff, including priority management, assignment, agency-visible hints, and resolution with email and push notifications.
 
+## 1. Set Bug Priority
 
-### 5. Environment Variables
+### 1.1 Update Priority
 
-No new environment variables were required for Day 1 — bug reporting uses the existing database connection and the existing generic upload endpoint's configuration.
+**`PATCH /admin/bugs/:id/priority`**
+
+Allows Super Admins to assign a priority level to a reported bug.
+
+#### Validation
+- Priority must be a valid `BugPriority`
+- Bug must exist
+
+#### Processing
+- Updates the `priority` field
+- Does not modify the bug status
+
+#### Implementation
+- `apps/api/src/services/bugReport.service.ts` → `setBugPriority`
+- `apps/api/src/controllers/bugReport.controller.ts` → `setBugPriorityController`
+- `apps/api/src/routes/bug.routes.ts`
+
+## 2. Assign Bug
+
+### 2.1 Assign to Platform Staff
+
+**`PATCH /admin/bugs/:id/assign`**
+
+Assigns a bug to a Platform Admin or Platform Support user.
+
+#### Validation
+- Assignee must exist
+- Assignee role must be `PLATFORM_ADMIN` or `PLATFORM_SUPPORT`
+- Bug must exist
+- Agency users cannot be assigned
+
+#### Processing
+- Updates `assigneeId`
+- Automatically changes status from `REPORTED` to `IN_PROGRESS`
+- Preserves existing `IN_PROGRESS` or `RESOLVED` status
+
+#### Implementation
+- `apps/api/src/services/bugReport.service.ts` → `assignBug`
+- `apps/api/src/controllers/bugReport.controller.ts` → `assignBugController`
+
+## 3. Add Bug Hint
+
+### 3.1 Add Hint
+
+**`POST /admin/bugs/:id/hint`**
+
+Allows platform staff to attach hints or workarounds visible to the reporting agency.
+
+#### Validation
+- Hint note must be non-empty after trimming
+- Bug must exist
+
+#### Processing
+- Trims hint text before persisting
+- Creates a new `BugHint`
+- Supports multiple hints on a bug
+- Sends email notification to the reporting agency
+
+#### Implementation
+- `apps/api/src/services/bugReport.service.ts` → `addBugHint`
+- `apps/api/src/controllers/bugReport.controller.ts` → `addBugHintController`
+
+## 4. Resolve Bug
+
+### 4.1 Resolve Bug
+
+**`PATCH /admin/bugs/:id/resolve`**
+
+Marks a bug as resolved, stores the resolution note, and notifies the reporting agency.
+
+#### Validation
+- Resolution note must be non-empty after trimming
+- Bug must exist
+- Cannot resolve an already resolved bug
+
+#### Processing
+- Updates status to `RESOLVED`
+- Saves the trimmed `resolutionNote`
+- Sends email notification
+- Sends push notification when an FCM token is available
+
+#### Implementation
+- `apps/api/src/services/bugReport.service.ts` → `resolveBug`
+- `apps/api/src/controllers/bugReport.controller.ts` → `resolveBugController`
+
+## 5. Data Model
+
+### Models
+- `BugReport` (updated)
+- `BugHint`
+
+### Enums
+- `UserRole`
+- `BugPriority`
+- `BugStatus`
+
+### Migration
+- `20260804124221_add_platform_roles`
+
+## 6. Testing Summary
+
+**Test file**
+- `apps/api/src/test/bugReporting/bugWorkflow.test.ts`
+
+**Covered Tests**
+- Priority updates
+- Bug assignment
+- Bug hints
+- Bug resolution
+
+**Result**
+-  Passed
+
+## Environment Variables
+
+No new environment variables were introduced. The module uses the existing database connection, upload service, email service, and push notification configuration.
 
 ```dotenv
-# packages/database/.env
 DATABASE_URL=postgresql://postgres:root@localhost:5432/funtush?schema=public
 ```
 
-
-### 6. Useful Commands
+## Useful Commands
 
 ```powershell
-# Run dev server
+# Run development server
 pnpm run dev
 
-# Run migrations
+# Run Prisma migrations
 pnpm --filter @funtush/database prisma migrate dev
 
 # Regenerate Prisma client
@@ -110,10 +213,11 @@ npx prisma generate
 # Open Prisma Studio
 npx prisma studio
 
-# Run just the bug reporting tests
+# Run bug reporting tests
 pnpm test bugReport.test.ts
+pnpm test bugWorkflow.test.ts
 
-# Run tests / lint across monorepo
+# Run all tests and lint
 pnpm test
 pnpm lint
 ```

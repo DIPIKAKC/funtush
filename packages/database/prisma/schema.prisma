@@ -17,6 +17,9 @@ enum AgencyStatus {
 enum UserRole {
   SUPER_ADMIN
   AGENCY_ADMIN
+  PLATFORM_ADMIN
+  PLATFORM_SUPPORT
+  TENANT_ADMIN
   STAFF
 }
 
@@ -284,6 +287,9 @@ model User {
   deviceTokens DeviceToken[]
 
   agencyUsers AgencyUser[]
+
+  assignedBugs BugReport[] @relation("BugAssignee")
+  bugHints     BugHint[]
 
   failedAttempts Int @default(0)
 
@@ -1390,6 +1396,22 @@ model BugReport {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
+  assignedToId String?
+  assignedTo   User?     @relation("BugAssignee", fields: [assignedToId], references: [id])
+  hints        BugHint[]
+
   @@index([agencyId])
   @@index([status])
+}
+
+model BugHint {
+  id          String    @id @default(cuid())
+  bugReportId String
+  bugReport   BugReport @relation(fields: [bugReportId], references: [id])
+  note        String
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([bugReportId])
 }
