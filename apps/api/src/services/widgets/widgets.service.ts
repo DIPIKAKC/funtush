@@ -102,12 +102,12 @@ export const livechatWidgetService = async (
         throw new Error("Agency not found");
     }
 
-    if (
-        data.liveChatEnabled &&
-        agency.tier.name !== "LARGE"
-    ) {
-        throw new Error("Live Chat feature is only available for Large tier.");
-    }
+    // if (
+    //     data.liveChatEnabled &&
+    //     agency.tier.name !== "LARGE"
+    // ) {
+    //     throw new Error("Live Chat feature is only available for Large tier.");
+    // }
 
     if (data.liveChatEnabled && !data.liveChatCode?.trim()) {
         throw new Error("Live Chat embed code is required.");
@@ -160,15 +160,15 @@ export const googleAnalyticsWidgetService = async (
         throw new Error("Agency not found");
     }
 
-    if (
-        data.googleAnalyticsId &&
-        agency.tier.name !== "MEDIUM" &&
-        agency.tier.name !== "LARGE"
-    ) {
-        throw new Error(
-            "Google Analytics is available only for Medium and Large plans."
-        );
-    }
+    // if (
+    //     data.googleAnalyticsId &&
+    //     agency.tier.name !== "MEDIUM" &&
+    //     agency.tier.name !== "LARGE"
+    // ) {
+    //     throw new Error(
+    //         "Google Analytics is available only for Medium and Large plans."
+    //     );
+    // }
 
     const profile = await db.agencyProfile.update({
         where: {
@@ -216,15 +216,15 @@ export const facebookPixelWidgetService = async (
         throw new Error("Agency not found");
     }
 
-    if (
-        data.facebookPixelId &&
-        agency.tier.name !== "MEDIUM" &&
-        agency.tier.name !== "LARGE"
-    ) {
-        throw new Error(
-            "Facebook pixel is available only for Medium and Large plans."
-        );
-    }
+    // if (
+    //     data.facebookPixelId &&
+    //     agency.tier.name !== "MEDIUM" &&
+    //     agency.tier.name !== "LARGE"
+    // ) {
+    //     throw new Error(
+    //         "Facebook pixel is available only for Medium and Large plans."
+    //     );
+    // }
 
     const profile = await db.agencyProfile.update({
         where: {
@@ -285,50 +285,46 @@ export const getWidgetsService = async (
         },
     });
 
-    if (!profile) {
-        throw new Error("Agency profile not found.");
-    }
-
     return {
         whatsapp: {
-            enabled: profile.whatsappEnabled,
-            number: profile.whatsappNumber,
+            enabled: profile?.whatsappEnabled,
+            number: profile?.whatsappNumber,
         },
 
         googleMaps: {
-            enabled: profile.googleMapsEnabled,
+            enabled: profile?.googleMapsEnabled,
         },
 
         liveChat: {
-            enabled: profile.liveChatEnabled,
-            code: profile.liveChatCode,
+            enabled: profile?.liveChatEnabled,
+            code: profile?.liveChatCode,
         },
 
         weather: {
-            enabled: profile.weatherWidgetEnabled,
+            enabled: profile?.weatherWidgetEnabled,
         },
 
         currencyConverter: {
-            enabled: profile.currencyConverterEnabled,
+            enabled: profile?.currencyConverterEnabled,
         },
 
         youtube: {
-            enabled: profile.youtubeEnabled,
-            videos: profile.youtubeVideos,
-            maxVideos: profile.maxYoutubeVideos,
+            enabled: profile?.youtubeEnabled,
+            videos: profile?.youtubeVideos,
+            maxVideos: profile?.maxYoutubeVideos,
         },
 
         googleAnalytics: {
-            id: profile.googleAnalyticsId,
+            id: profile?.googleAnalyticsId,
         },
 
         facebookPixel: {
-            id: profile.facebookPixelId,
+            id: profile?.facebookPixelId,
         },
 
         instagram: {
-            connected: profile.instagramConnected,
-            feedEnabled: profile.instagramFeedEnabled,
+            connected: profile?.instagramConnected,
+            feedEnabled: profile?.instagramFeedEnabled,
         },
     };
 };
