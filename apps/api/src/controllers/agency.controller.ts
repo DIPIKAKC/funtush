@@ -176,10 +176,10 @@ export const updateAgencyProfile = async (req: Request, res: Response) => {
             success: true,
             data: result.data,
         });
-    } catch (err) {
+    } catch (err:any) {
         res.status(500).json({
             status: "error",
-            message: err
+            message: err.message
         });
     }
 };

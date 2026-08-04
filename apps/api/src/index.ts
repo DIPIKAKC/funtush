@@ -49,7 +49,7 @@ app.use("/", agencyCustomerRoutes);
 app.use("/", reviewRoutes);
 app.use("/", couponRoutes);
 app.use("/", branchRoutes);
-app.use("/", widgetsRoutes);
+app.use("/agencies/me/widgets", widgetsRoutes);
 app.use("/", instagramRoutes);
 
 

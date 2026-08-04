@@ -31,7 +31,11 @@ export const tierGate =
                         id: agencyUser.agencyId,
                     },
                     include: {
-                        tier: true,
+                        tier: {
+                            select: {
+                                name: true
+                            }
+                        }
                     },
                 });
 
