@@ -8,6 +8,10 @@ import {
   offlinePackageController,
   offlinePackageVersionController,
 } from "../controllers/offlinePackage.controller";
+import {
+  registerDeviceController,
+  unregisterDeviceController,
+} from "../controllers/deviceToken.controller";
 
 /**
  * ── Mobile API routes (Mobile week · Day 1) ──────────────────────────────────
@@ -98,5 +102,31 @@ router.get(
   requireRole(OFFLINE_PACKAGE_ROLES),
   offlinePackageController
 );
+
+/* ── Push token & device management (Mobile week · Day 3) ─────────────────── */
+
+/**
+ * These two routes carry `requireAuth` but **no** `requireRole`, and that is a
+ * deliberate difference from every route above.
+ *
+ * `requireRole` exists to answer "is this kind of user allowed to see this kind
+ * of data?". Here there is no such question: the only row a caller can create,
+ * refresh or delete is one keyed to their own `userId`, taken from their own
+ * verified token. A trekker, a guide, an agency admin and a platform admin all
+ * have the same, equally legitimate need — the app on their phone must be able
+ * to receive notifications. Adding a role list would only mean that the next
+ * role someone invents silently stops getting push, which for SOS alerts
+ * (Backend Guide §10) is the exact failure mode we cannot afford.
+ */
+router.post("/register-device", requireAuth, registerDeviceController);
+
+/**
+ * `DELETE` rather than `POST /unregister-device`: the same resource identifier
+ * ("this device's registration") with the verb that says what happens to it.
+ * The token itself travels in the body or query, not the path, because a path
+ * segment ends up in access logs and proxy logs — and a token in a log file is a
+ * token anyone with log access can push to.
+ */
+router.delete("/register-device", requireAuth, unregisterDeviceController);
 
 export default router;

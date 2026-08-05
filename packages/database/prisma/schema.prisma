@@ -125,6 +125,19 @@ enum EmergencyContactType {
   INSURANCE
 }
 
+/// Which app store / runtime a registered device token came from.
+///
+/// Firebase Cloud Messaging needs this because the *same* logical notification
+/// is delivered differently per platform: Android reads the `android.priority`
+/// block, iOS reads the `apns.payload.aps` block, and web push reads neither.
+/// Storing the platform next to the token is what lets the sender build the
+/// right message shape without a second lookup — Backend Guide §13.
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+}
+
 model SubscriptionTier {
   id           String  @id @default(uuid())
   name         String  @unique
@@ -257,8 +270,18 @@ model User {
   trekker Trekker?
 
   refreshTokens RefreshToken[]
-  fcmToken      String?        @map("fcm_token")
-  agencyUsers   AgencyUser[]
+
+  /// LEGACY — the original single-token field (one phone per account).
+  ///
+  /// Superseded by the `deviceTokens` relation below (Mobile week · Day 3), which
+  /// supports the real case of a trekker with a phone *and* a tablet. Kept only
+  /// because `notification.service.ts` still reads it; new code must not write it.
+  fcmToken String? @map("fcm_token")
+
+  /// Every device this user has registered for push. See `DeviceToken`.
+  deviceTokens DeviceToken[]
+
+  agencyUsers AgencyUser[]
 
   failedAttempts Int @default(0)
 
@@ -268,6 +291,54 @@ model User {
   updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+/// ── Push token registry (Mobile week · Day 3) ────────────────────────────────
+///
+/// One row per *device*, not per user. A trekker who owns a phone and a tablet
+/// has two rows; both must ring when an SOS fires, so push delivery reads the
+/// whole set for a user rather than a single column.
+///
+/// Nothing here is agency data, so there is no `tenant_id`: a device belongs to a
+/// platform-level `User`, exactly like the `Trekker` identity in Backend Guide §7.
+/// Isolation is enforced by the fact that every query is keyed on `user_id`.
+model DeviceToken {
+  id String @id @default(uuid())
+
+  /// The account currently signed in on this device.
+  userId String @map("user_id")
+
+  /// The FCM registration token — the address Firebase delivers to.
+  ///
+  /// **Unique**, and that uniqueness is the whole design. Firebase issues one
+  /// token per app installation, so the token *is* the device's identity. If
+  /// Asha logs out of the office iPad and Bina logs in, Firebase hands the app
+  /// the same token; the unique constraint forces that row to be reassigned to
+  /// Bina instead of creating a duplicate that would push Asha's private trek
+  /// details to a phone she no longer holds.
+  fcmToken String @unique @map("fcm_token")
+
+  /// Android / iOS / Web — decides the message shape the sender builds.
+  platform DevicePlatform
+
+  /// Last time the app proved this token is still live, by re-registering it.
+  ///
+  /// FCM silently stops delivering to tokens untouched for ~270 days, so this is
+  /// what lets a cleanup job drop dead rows instead of pushing into the void.
+  lastActiveAt DateTime @default(now()) @map("last_active_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// `Cascade`: deleting the account deletes its devices. A push token that
+  /// outlived its owner is a notification sent to a stranger's phone.
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// "Every token for this user" is the read path of every push send.
+  @@index([userId])
+  /// Supports the stale-token cleanup job's `lastActiveAt < cutoff` scan.
+  @@index([lastActiveAt])
+  @@map("device_tokens")
 }
 
 model Trekker {
@@ -732,23 +803,23 @@ model AgencyProfile {
 
   facebookPixelId String? @map("facebook_pixel_id")
 
-  instagramConnected Boolean @default(false) @map("instagram_connected")
-  instagramFeedEnabled Boolean @default(false) @map("instagram_feed_enabled")
-  instagramBusinessId String? @map("instagram_business_id")
-  instagramAccessToken String? @map("instagram_access_token") @db.Text
+  instagramConnected      Boolean   @default(false) @map("instagram_connected")
+  instagramFeedEnabled    Boolean   @default(false) @map("instagram_feed_enabled")
+  instagramBusinessId     String?   @map("instagram_business_id")
+  instagramAccessToken    String?   @map("instagram_access_token") @db.Text
   instagramTokenExpiresAt DateTime? @map("instagram_token_expires_at")
   //
 
   //Utility Widgets
   currencyConverterEnabled Boolean @default(false) @map("currency_converter_enabled")
-  
+
   weatherWidgetEnabled Boolean @default(false) @map("weather_enabled")
   //
 
   //YouTube Embeds
-  youtubeEnabled   Boolean @default(false)
-  youtubeVideos    String[] @default([]) 
-  maxYoutubeVideos Int? @default(10)
+  youtubeEnabled   Boolean  @default(false)
+  youtubeVideos    String[] @default([])
+  maxYoutubeVideos Int?     @default(10)
   //
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -983,10 +1054,10 @@ model AdCampaign {
   clicks      Int     @default(0)
   spend       Decimal @default(0) @db.Decimal(12, 2)
 
-  metaCampaignId   String?
-  googleCampaignId String?
+  metaCampaignId         String?
+  googleCampaignId       String?
   googleSearchCampaignId String?
-  rejectionReason  String?
+  rejectionReason        String?
 
   performanceDaily AdPerformanceDaily[]
 
