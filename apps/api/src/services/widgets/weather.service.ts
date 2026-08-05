@@ -40,15 +40,15 @@ export const updateWeatherWidgetService = async (
         throw new Error("Agency not found.");
     }
 
-    if (!["MEDIUM", "LARGE"].includes(agency.tier.name)) {
-        throw new Error(
-            "Weather widget is available only for Medium and Large plans."
-        );
-    }
+    // if (!["MEDIUM", "LARGE"].includes(agency.tier.name)) {
+    //     throw new Error(
+    //         "Weather widget is available only for Medium and Large plans."
+    //     );
+    // }
 
     return await db.agencyProfile.update({
         where: {
-            id: agency.id,
+            agencyId: agency.id,
         },
         data: {
             weatherWidgetEnabled: data.enabled,
@@ -94,10 +94,16 @@ export const weatherApiService = async (
         ),
     ]);
 
+    const convertToNepalDateTime = (utcDateTime: string): string => {
+        return new Date(utcDateTime + " UTC").toLocaleString("en-GB", {
+            timeZone: "Asia/Kathmandu",
+            hour12: true,
+        });
+    };
+
     return {
         city: currentWeather.data.name,
         country: currentWeather.data.sys.country,
-
         current: {
             weather: currentWeather.data.weather[0].description,
             temperature: currentWeather.data.main.temp,
@@ -107,7 +113,34 @@ export const weatherApiService = async (
             visibility: currentWeather.data.visibility,
             windSpeed: currentWeather.data.wind.speed,
         },
-        forecast: forecastWeather.data.list.slice(0, 5).map(
+        forecast_combined_1_per_5days: forecastWeather.data.list
+            .filter((item: { dt_txt: string }) => {
+                return item.dt_txt.endsWith("06:00:00")
+            })
+            .slice(0, cnt)
+            .map((item: {
+                dt_txt: string;
+                main: {
+                    temp: number;
+                    feels_like: number;
+                    humidity: number;
+                };
+                weather: {
+                    description: string;
+                    icon: string;
+                }[];
+                wind: {
+                    speed: number;
+                };
+            }) => ({
+                date_AM: convertToNepalDateTime(item.dt_txt),
+                weather: item.weather[0].description,
+                temperature: item.main.temp,
+                feelsLike: item.main.feels_like,
+                humidity: item.main.humidity,
+                windSpeed: item.wind.speed,
+            })),
+        forecast_of_5_days_3_hours_interval: forecastWeather.data.list.map(
             (item: {
                 dt_txt: string;
                 main: {
@@ -124,7 +157,7 @@ export const weatherApiService = async (
                 };
             }
             ) => ({
-                date: item.dt_txt,
+                date: convertToNepalDateTime(item.dt_txt),
                 weather: item.weather[0].description,
                 temperature: item.main.temp,
                 feelsLike: item.main.feels_like,

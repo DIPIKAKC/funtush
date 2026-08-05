@@ -307,7 +307,6 @@ async function main() {
 
   });
 
-
   console.log("seed completed");
   console.log("Test package ID:", testPackage.id);
   console.log("Test departure date ID:", departureDate.id);

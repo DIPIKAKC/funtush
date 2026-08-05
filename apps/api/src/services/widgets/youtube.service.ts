@@ -48,7 +48,11 @@ export const updateYoutubeWidgetService = async (
             id: agencyUser.agencyId
         },
         include: {
-            tier: true
+            tier: {
+                select: {
+                    name: true
+                }
+            }
         }
     });
 
@@ -56,11 +60,11 @@ export const updateYoutubeWidgetService = async (
         throw new Error("Agency not found.");
     }
 
-    if (!["MEDIUM", "LARGE"].includes(agency.tier.name)) {
-        throw new Error(
-            "YouTube widget is available only for Medium and Large plans."
-        );
-    }
+    // if (!["MEDIUM", "LARGE"].includes(agency.tier.name)) {
+    //     throw new Error(
+    //         "YouTube widget is available only for Medium and Large plans."
+    //     );
+    // }
 
     const videoCount = await db.agencyProfile.findFirst({
         where: {
@@ -97,7 +101,7 @@ export const updateYoutubeWidgetService = async (
         ids.add(id);
     }
 
-    return await db.agencyProfile.update({
+    const updatedData= await db.agencyProfile.update({
         where: {
             agencyId: agency.id
         },
@@ -110,6 +114,7 @@ export const updateYoutubeWidgetService = async (
             youtubeVideos: true
         }
     });
+    console.log("updatedYTBdata:",updatedData)
 
 };
 
@@ -141,11 +146,11 @@ export const getYoutubeWidgetService = async (
         }
     });
 
-    if (!profile) {
-        throw new Error("Agency profile not found.");
-    }
+    // if (!profile) {
+    //     throw new Error("Agency profile not found.");
+    // }
 
-    const videos = profile.youtubeVideos.map((url) => {
+    const videos = profile?.youtubeVideos.map((url) => {
         const id = extractYoutubeVideoId(url);
         return {
             url,
@@ -157,7 +162,7 @@ export const getYoutubeWidgetService = async (
     });
 
     return {
-        youtubeEnabled: profile.youtubeEnabled,
+        youtubeEnabled: profile?.youtubeEnabled,
         youtubeVideos: videos
     };
 

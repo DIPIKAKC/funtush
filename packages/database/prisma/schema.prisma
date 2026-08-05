@@ -577,7 +577,9 @@ model GuideProfile {
   languages      String[] @default([])
 
   isActive Boolean @default(true) @map("is_active")
+  branchId String? @map("branch_id")
 
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1106,6 +1108,7 @@ model Branch {
 
   packageBranches PackageBranch[]
   bookings        Booking[]
+  guides          GuideProfile[]
 
   @@index([agencyId])
   @@index([managerStaffId])
