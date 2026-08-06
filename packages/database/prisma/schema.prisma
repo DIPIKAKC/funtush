@@ -17,6 +17,9 @@ enum AgencyStatus {
 enum UserRole {
   SUPER_ADMIN
   AGENCY_ADMIN
+  PLATFORM_ADMIN
+  PLATFORM_SUPPORT
+  TENANT_ADMIN
   STAFF
 }
 
@@ -191,6 +194,10 @@ model Agency {
   accounts       Account[]
   journalEntries JournalEntry[]
 
+  bugReports BugReport[]
+  apiKeys ApiKey[]
+
+
   stripeSubscription StripeSubscription?
 
   khaltiTransactions         KhaltiTransaction[]
@@ -282,6 +289,9 @@ model User {
   deviceTokens DeviceToken[]
 
   agencyUsers AgencyUser[]
+
+  assignedBugs BugReport[] @relation("BugAssignee")
+  bugHints     BugHint[]
 
   failedAttempts Int @default(0)
 
@@ -1356,4 +1366,75 @@ model TransactionFee {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("transaction_fees")
+}
+
+enum BugStatus {
+  REPORTED
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum BugPriority {
+  CRITICAL
+  HIGH
+  NORMAL
+  LOW
+}
+
+model BugReport {
+  id                String       @id @default(cuid())
+  agencyId          String
+  agency            Agency       @relation(fields: [agencyId], references: [id])
+
+  title             String
+  description       String
+  stepsToReproduce  String?
+  screenshotUrl     String?
+
+  status            BugStatus    @default(REPORTED)
+  priority          BugPriority?
+  resolutionNote    String?
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  assignedToId String?
+  assignedTo   User?     @relation("BugAssignee", fields: [assignedToId], references: [id])
+  hints        BugHint[]
+
+  @@index([agencyId])
+  @@index([status])
+}
+
+model BugHint {
+  id          String    @id @default(cuid())
+  bugReportId String
+  bugReport   BugReport @relation(fields: [bugReportId], references: [id])
+  note        String
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([bugReportId])
+}
+
+enum ApiKeyScope {
+  READ_ONLY
+  READ_WRITE
+}
+
+model ApiKey {
+  id          String      @id @default(cuid())
+  agencyId    String
+  agency      Agency      @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  name        String
+  keyHash     String      @unique
+  keyPrefix   String      
+  scope       ApiKeyScope @default(READ_ONLY)
+  lastUsedAt  DateTime?   @map("last_used_at")
+  revoked     Boolean     @default(false)
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  @@index([agencyId])
+  @@map("api_keys")
 }
