@@ -26,8 +26,8 @@ describe('API Key Management', () => {
                     features: JSON.stringify(['bugs', 'api_keys']),
                 },
             });
-        } catch (err: any) {
-            if (err.code !== 'P2002') throw err;
+        } catch (err) {
+            if (!(err instanceof Error) || (err as { code?: string }).code !== 'P2002') throw err;
             const existing = await db.subscriptionTier.findUniqueOrThrow({ where: { name: 'LARGE' } });
             mockTierId = existing.id;
         }

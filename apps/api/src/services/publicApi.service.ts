@@ -1,5 +1,9 @@
 import { prisma } from "../packages/database/prisma";
 
+type BookingFindManyArgs = NonNullable<Parameters<typeof prisma.booking.findMany>[0]>;
+type BookingWhereInput = NonNullable<BookingFindManyArgs["where"]>;
+type BookingStatusValue = NonNullable<BookingWhereInput["status"]>;
+
 export async function listPublicPackages(agencyId: string, page = 1, limit = 20) {
     const where = { agencyId, status: "PUBLISHED" as const };
 
@@ -27,7 +31,10 @@ export async function listPublicPackages(agencyId: string, page = 1, limit = 20)
 }
 
 export async function listPublicBookings(agencyId: string, page = 1, limit = 20, status?: string) {
-    const where = { agencyId, ...(status ? { status: status as any } : {}) };
+    const where: BookingFindManyArgs["where"] = {
+        agencyId,
+        ...(status ? { status: status as BookingStatusValue } : {}),
+    };
 
     const [items, total] = await Promise.all([
         prisma.booking.findMany({

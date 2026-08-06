@@ -4,6 +4,8 @@ import { listPublicPackages, listPublicBookings } from '../../services/publicApi
 import { checkPublicApiRateLimit } from '../../services/rateLimit.service';
 import { createApiKey } from '../../services/apiKey.service';
 
+type ApiKeyResult = Awaited<ReturnType<typeof createApiKey>>;
+
 describe(' Public API Surface (Read-Only v1)', () => {
     let mockTierId = 'tier_publicapi_' + Date.now();
     const agency1Id = 'agency_publicapi_1_' + Date.now();
@@ -23,9 +25,8 @@ describe(' Public API Surface (Read-Only v1)', () => {
     const agency1Booking2Id = 'booking_a1_b2_' + Date.now();
     const agency2Booking1Id = 'booking_a2_b1_' + Date.now();
 
-    let agency1ApiKey: any;
-    let agency2ApiKey: any;
-    let agency1ReadOnlyKey: any;
+    let agency1ApiKey: ApiKeyResult;
+    let agency1ReadOnlyKey: ApiKeyResult;
 
     beforeAll(async () => {
         try {
@@ -39,8 +40,8 @@ describe(' Public API Surface (Read-Only v1)', () => {
                     features: JSON.stringify(['api_keys']),
                 },
             });
-        } catch (err: any) {
-            if (err.code !== 'P2002') throw err;
+        } catch (err) {
+            if (!(err instanceof Error) || (err as { code?: string }).code !== 'P2002') throw err;
             const existing = await db.subscriptionTier.findUniqueOrThrow({ where: { name: 'LARGE' } });
             mockTierId = existing.id;
         }
@@ -66,7 +67,7 @@ describe(' Public API Surface (Read-Only v1)', () => {
         });
 
         agency1ApiKey = await createApiKey(agency1Id, 'Agency 1 API Key', 'READ_ONLY');
-        agency2ApiKey = await createApiKey(agency2Id, 'Agency 2 API Key', 'READ_ONLY');
+        await createApiKey(agency2Id, 'Agency 2 API Key', 'READ_ONLY');
         agency1ReadOnlyKey = await createApiKey(agency1Id, 'Agency 1 RO Key 2', 'READ_ONLY');
 
         await db.trekPackage.create({
@@ -257,6 +258,8 @@ describe(' Public API Surface (Read-Only v1)', () => {
             expect(page1.items.length).toBeLessThanOrEqual(1);
             expect(page1.page).toBe(1);
             expect(page1.limit).toBe(1);
+            expect(page2.page).toBe(2);
+            expect(page2.items).not.toEqual(page1.items);
         });
 
         it('returns empty list for agency with no published packages', async () => {
@@ -322,6 +325,8 @@ describe(' Public API Surface (Read-Only v1)', () => {
 
             expect(page1.items.length).toBeLessThanOrEqual(1);
             expect(page1.limit).toBe(1);
+            expect(page2.page).toBe(2);
+            expect(page2.items).not.toEqual(page1.items);
         });
 
         it('returns empty list for agency with no bookings', async () => {
