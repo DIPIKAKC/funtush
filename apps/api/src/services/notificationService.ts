@@ -12,6 +12,18 @@ interface PushNotificationOptions {
   timeout?: number;
 }
 
+// Values allowed by emailService's EmailTemplateData index signature
+type EmailSafeValue = string | number | boolean | string[] | Record<string, unknown>;
+type EmailSafeData = Record<string, EmailSafeValue>;
+
+interface AdminNotificationPayload {
+  type: string;
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  priority?: 'HIGH' | 'NORMAL';
+}
+
 class NotificationService {
   private pushTimeoutMs: number;
 
@@ -31,7 +43,7 @@ class NotificationService {
     const { priority = 'NORMAL' } = options;
 
     // Try push notification first if token available
-    if (pushToken && priority !== 'CRITICAL') {
+    if (pushToken) {
       try {
         const pushResult = await this.sendPushWithTimeout(pushToken, {
           title: 'Funtush Alert',
@@ -47,9 +59,11 @@ class NotificationService {
       }
     }
 
-    // Fallback to SMS
+    // Fallback to SMS — map our priority vocabulary to smsService's
+    const smsPriority: 'NORMAL' | 'CRITICAL' = priority === 'HIGH' ? 'CRITICAL' : 'NORMAL';
+
     const smsResult = await smsService.sendSMS(phoneNumber, message, {
-      priority,
+      priority: smsPriority,
     });
 
     return {
@@ -86,7 +100,7 @@ class NotificationService {
   async sendEmailNotification(
     to: string,
     template: string,
-    data: Record<string, unknown>
+    data: EmailSafeData
   ): Promise<{ success: boolean; messageId?: string }> {
     try {
       const result = await emailService.send({
@@ -104,6 +118,48 @@ class NotificationService {
       console.error('[NOTIFICATION] Email send error:', _error instanceof Error ? _error.message : String(_error));
       return { success: false };
     }
+  }
+
+  /**
+   * Send a notification to all admins (e.g. campaign approval requests)
+   */
+  async sendNotificationToAdmins(
+    payload: AdminNotificationPayload
+  ): Promise<{ success: boolean }> {
+    // TODO: replace with a real admin lookup (DB query) if you have an Admin/User table
+    const adminPhoneNumbers = (process.env.ADMIN_PHONE_NUMBERS || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const adminEmails = (process.env.ADMIN_EMAILS || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    // Narrow the loosely-typed incoming data down to values emailService accepts
+    const safeData: EmailSafeData = {
+      title: payload.title,
+      message: payload.message,
+      ...sanitizeForEmail(payload.data),
+    };
+
+    const results = await Promise.allSettled([
+      ...adminPhoneNumbers.map((phone) =>
+        this.sendNotification(phone, null, payload.message, {
+          priority: payload.priority,
+        })
+      ),
+      ...adminEmails.map((email) =>
+        this.sendEmailNotification(email, payload.type, safeData)
+      ),
+    ]);
+
+    const success = results.some(
+      (r) => r.status === 'fulfilled' && r.value.success
+    );
+
+    return { success };
   }
 
   /**
@@ -127,6 +183,32 @@ class NotificationService {
       return { success: false };
     }
   }
+}
+
+/**
+ * Strip out any values that aren't safe for EmailTemplateData
+ */
+function sanitizeForEmail(data?: Record<string, unknown>): EmailSafeData {
+  if (!data) return {};
+
+  const result: EmailSafeData = {};
+
+  for (const [key, value] of Object.entries(data)) {
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      result[key] = value;
+    } else if (Array.isArray(value) && value.every((v) => typeof v === 'string')) {
+      result[key] = value as string[];
+    } else if (value !== null && typeof value === 'object') {
+      result[key] = value as Record<string, unknown>;
+    }
+    // silently drop anything else (functions, symbols, undefined, etc.)
+  }
+
+  return result;
 }
 
 export const notificationService = new NotificationService();

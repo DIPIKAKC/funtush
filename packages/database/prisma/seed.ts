@@ -70,8 +70,12 @@ async function main() {
     }
   ];
 
+  // Capture created users by email so later seed steps (agencyStaff, etc.)
+  // can reference their REAL ids instead of stale hardcoded ones.
+  const usersByEmail: Record<string, Awaited<ReturnType<typeof prisma.user.upsert>>> = {};
+
   for (const user of users) {
-    await prisma.user.upsert({
+    usersByEmail[user.email] = await prisma.user.upsert({
       where: { email: user.email },
       update: {
         passwordHash,
@@ -86,6 +90,8 @@ async function main() {
       }
     });
   }
+
+  const agencyAdminUser = usersByEmail["agency@funtush.com"];
 
   const permissions = [
     { key: "USER_READ", description: "Read users" },
@@ -102,7 +108,7 @@ async function main() {
     });
   }
 
-  // const freeTier = 
+  // const freeTier =
   await prisma.subscriptionTier.upsert({
     where: { name: "FREE" },
     update: {},
@@ -130,7 +136,44 @@ async function main() {
     }
   });
 
-  // Test package + departure date for E2E booking flow 
+  const agencyUserLink = await prisma.agencyUser.upsert({
+    where: {
+      agencyId_userId: {
+        agencyId: testAgency.id,
+        userId: agencyAdminUser.id,
+      },
+    },
+    update: {},
+    create: {
+      agencyId: testAgency.id,
+      userId: agencyAdminUser.id,
+      role: "AGENCY_ADMIN",
+    },
+  });
+
+  // explicitly, or Prisma generates a new random id every time and the
+  // `where: { id: ... }` match never hits on future runs.
+  await prisma.agencyStaff.upsert({
+    where: { id: "10000000-0000-0000-0000-000000000001" },
+    update: {},
+    create: {
+      id: "10000000-0000-0000-0000-000000000001",
+      agencyId: testAgency.id,
+      userId: agencyUserLink.id
+    }
+  });
+
+  await prisma.subscription.upsert({
+    where: { id: "10000000-0000-0000-0000-000000000000" },
+    update: {},
+    create: {
+      id: "10000000-0000-0000-0000-000000000000",
+      agencyId: testAgency.id,
+      tierId: freeTierId
+    }
+  });
+
+  // Test package + departure date for E2E booking flow
   const testPackage = await prisma.trekPackage.upsert({
     where: { slug: "everest-base-camp-test" },
     update: { status: "PUBLISHED" },
@@ -138,6 +181,22 @@ async function main() {
       agencyId: testAgency.id,
       title: "Everest Base Camp Trek (Test)",
       slug: "everest-base-camp-test",
+      description: "Test package for E2E booking flow testing.",
+      durationDays: 14,
+      pricePerPerson: 1200,
+      difficulty: "CHALLENGING",
+      maxGroupSize: 10,
+      status: "PUBLISHED",
+    },
+  });
+
+  const testPackage2 = await prisma.trekPackage.upsert({
+    where: { slug: "abc-test" },
+    update: { status: "PUBLISHED" },
+    create: {
+      agencyId: testAgency.id,
+      title: "ABC Trek (Test)",
+      slug: "abc-test", 
       description: "Test package for E2E booking flow testing.",
       durationDays: 14,
       pricePerPerson: 1200,
@@ -187,14 +246,39 @@ async function main() {
     },
   });
 
+  const testTrekker = await prisma.trekker.upsert({
+    where: {
+      userId: "00000000-0000-0000-0000-000000000301",
+    },
+    update: {},
+    create: {
+      user: {
+        create: {
+          email: "john@test.com",
+          passwordHash,
+          role: UserRole.STAFF,
+          roleType: RoleType.TREKKER,
+        },
+      },
+      fullName: "John Doe",
+      phone: "1111111111",
+      country: "Nepal",
+      nationality: "Nepali",
+      emergencyContactName: "Jane Doe",
+      emergencyContactPhone: "9800000000",
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+      isActive: true,
+    },
+  });
 
   const testBooking = await prisma.booking.upsert({
     where: { id: "00000000-0000-0000-0000-000000000111" },
     update: {},
     create:
     {
-      agencyId: "6c34f8d4-77ba-4c55-80f6-897e10277dd0",
-      trekkerId: "f3b41def-1fea-414c-aeb2-a1e5d980c204",
+      agencyId: testAgency.id,
+      trekkerId: testTrekker.id,
       packageId: testPackage.id,
       departureDateId: departureDate.id,
       groupSize: 7,
@@ -206,15 +290,15 @@ async function main() {
     },
 
   });
-  
+
   const testReview = await prisma.review.upsert({
     where: { id: "00000000-0000-0000-0000-000000000222" },
     update: {},
     create:
     {
-      agencyId: "6c34f8d4-77ba-4c55-80f6-897e10277dd0",
-      bookingId: "e1b6433f-719b-42ea-9f88-5e5b909d2a66",
-      trekkerId: "f3b41def-1fea-414c-aeb2-a1e5d980c204",
+      agencyId: testAgency.id,
+      bookingId: testBooking.id,
+      trekkerId: testTrekker.id,
       assignedGuideId: "00000000-0000-0000-0000-000000000221",
       rating: 4,
       text: "Had a great time.",
@@ -222,7 +306,6 @@ async function main() {
     },
 
   });
-
 
   console.log("seed completed");
   console.log("Test package ID:", testPackage.id);

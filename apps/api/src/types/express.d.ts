@@ -21,8 +21,13 @@ declare global {
       agencyId?: string | null;
       context?: "platform" | "agency" | "admin";
       adminIpAllowed?: boolean;
+      apiKeyAuth?: {
+        agencyId: string;
+        scope: "READ_ONLY" | "READ_WRITE";
+        keyId: string;
+      };
     }
   }
 }
 
-export {};
+export { };
