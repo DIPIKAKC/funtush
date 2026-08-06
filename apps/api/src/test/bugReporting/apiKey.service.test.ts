@@ -7,32 +7,21 @@ import {
     authenticateApiKey,
     ApiKeyError,
 } from '../../services/apiKey.service';
+import { ensureLargeTier } from './largeTier';
 
 describe('API Key Management', () => {
     const mockTierId = 'tier_apikey_' + Date.now();
     const mockAgencyId = 'agency_apikey_' + Date.now();
     const agencyAdminUserId = 'user_agencyadmin_apikey_' + Date.now();
 
-    beforeAll(async () => {
-        // Clean up any leftover data from previous runs
-        // Delete agencies first to avoid foreign key violations
-        const largeTier = await db.subscriptionTier.findFirst({ where: { name: 'LARGE' } });
-        if (largeTier) {
-            await db.agency.deleteMany({ where: { tierId: largeTier.id } });
-            await db.subscriptionTier.delete({ where: { id: largeTier.id } });
-        }
+    /** Resolved in `beforeAll` — see `ensureLargeTier` for why it is shared. */
+    let largeTierId: string;
 
-        // Create subscription tier
-        await db.subscriptionTier.create({
-            data: {
-                id: mockTierId,
-                name: 'LARGE',
-                maxStaff: 50,
-                maxGuides: 25,
-                monthlyPrice: 5000,
-                features: JSON.stringify(['bugs', 'api_keys']),
-            },
-        });
+    beforeAll(async () => {
+        // The LARGE tier is a single, unique, seeded row that this file shares
+        // with `apiKey.integration.test.ts`. Reuse it rather than deleting and
+        // recreating it — see `largeTier.ts` for the full explanation.
+        largeTierId = await ensureLargeTier(mockTierId);
 
         // Create agency with LARGE tier
         await db.agency.create({
@@ -41,7 +30,7 @@ describe('API Key Management', () => {
                 name: 'API Key Test Agency',
                 email: 'apikey_' + Date.now() + '@test.com',
                 slug: 'apikey-agency-' + Date.now(),
-                tierId: mockTierId,
+                tierId: largeTierId,
             },
         });
 
@@ -70,7 +59,9 @@ describe('API Key Management', () => {
         await db.agencyUser.deleteMany({ where: { agencyId: mockAgencyId } });
         await db.user.deleteMany({ where: { id: agencyAdminUserId } });
         await db.agency.deleteMany({ where: { id: mockAgencyId } });
-        await db.subscriptionTier.deleteMany({ where: { id: mockTierId } });
+        // The LARGE tier is deliberately NOT deleted: it is shared with
+        // `apiKey.integration.test.ts` and is seeded by `prisma/seed.ts`.
+        // Deleting it is what broke this suite. See `largeTier.ts`.
     });
 
     describe('createApiKey', () => {
@@ -124,7 +115,11 @@ describe('API Key Management', () => {
             await db.subscriptionTier.create({
                 data: {
                     id: starterTierId,
-                    name: 'STARTER',
+                    // Unique per run. `SubscriptionTier.name` is `@unique`, so a
+                    // fixed "STARTER" would collide with a leftover row if this
+                    // test ever failed before reaching its cleanup below. The
+                    // assertion only cares that the tier is *not* LARGE.
+                    name: 'STARTER_' + Date.now(),
                     maxStaff: 5,
                     maxGuides: 2,
                     monthlyPrice: 500,
