@@ -74,8 +74,6 @@ export const createBranchService = async (
         );
     }
 
-<<<<<<< HEAD
-
     if (data.managerStaffId) {
         const manager = await db.agencyStaff.findFirst({
             where: {
@@ -89,8 +87,6 @@ export const createBranchService = async (
             throw new Error("Manager does not belong to your agency.");
     }
 
-=======
->>>>>>> origin/develop
     if (data.isHeadOffice === true) {
         const existing = await db.branch.findFirst({
             where: {
@@ -110,10 +106,7 @@ export const createBranchService = async (
             address: data.address,
             phone: data.phone,
             whatsapp: data.whatsapp,
-<<<<<<< HEAD
             managerStaffId: data.managerStaffId,
-=======
->>>>>>> origin/develop
             isHeadOffice: data.isHeadOffice ?? false
         }
     });
@@ -314,6 +307,13 @@ export const assignGuideToBranchService = async (
         },
         select: {
             agencyId: true
+        }
+    });
+
+    if (!agencyUser) {
+        throw new Error("Agency user not found");
+    }
+
     if (!data.branchId) {
         throw new Error("Please select a branch.");
     }
@@ -378,12 +378,6 @@ export const assignGuideToBranchService = async (
         updatedGuide,
         updatedBranch
     };
-
-    return {
-        updatedGuide: updatedGuide,
-        updatedBranch: updatedBranch
-    };
->>>>>>> origin/develop
 }
 
 export const assignPackageToBranchService = async (
