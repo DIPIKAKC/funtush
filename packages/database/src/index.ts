@@ -1,6 +1,7 @@
 
 export * from "./db";
 export * from "./redis";
+export * from "./mongo";
 export * from "@prisma/client";
 
 import { tenantKey, type TenantContext } from "@funtush/shared";

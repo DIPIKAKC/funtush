@@ -307,14 +307,14 @@ export const updateAgencyProfileService = async (
   // helper to safely store JSON in Prisma
   const toJson = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
-  let maps_url: string | undefined;
+  // let maps_url: string | undefined;
 
-  // Build Google Maps URL
-  if (data.address) {
-    maps_url = `https://www.google.com/maps?q=${encodeURIComponent(
-      data.address
-    )}&output=embed`;
-  }
+  // // Build Google Maps URL
+  // if (data.address) {
+  //   maps_url = `https://www.google.com/maps?q=${encodeURIComponent(
+  //     data.address
+  //   )}&output=embed`;
+  // }
 
 
   // Map fields to db format (camelCase)
@@ -349,9 +349,9 @@ export const updateAgencyProfileService = async (
 
 
   // Add maps URL if address exists
-  if (maps_url) {
-    updateData.mapsUrl = maps_url;
-  }
+  // if (maps_url) {
+  //   updateData.mapsUrl = maps_url;
+  // }
 
 
 
@@ -365,12 +365,12 @@ export const updateAgencyProfileService = async (
   console.log("agencyId:", agencyId);
   console.log("updateData:", updateData);
 
-  await db.agency.update({
-    where: { id: agencyId },
-    data: {
-      mapsUrl: maps_url,
-    }
-  });
+  // await db.agency.update({
+  //   where: { id: agencyId },
+  //   data: {
+  //     mapsUrl: maps_url,
+  //   }
+  // });
 
   const result = await db.agencyProfile.upsert({
     where: {

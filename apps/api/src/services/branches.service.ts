@@ -311,24 +311,74 @@ export const assignGuideToBranchService = async (
         }
     });
 
-    if (!agencyUser)
+    if (!agencyUser) {
         throw new Error("Agency user not found");
-
-    if (data.branchId) {
-        const branch = await db.branch.findFirst({
-            where: {
-                id: data.branchId,
-                agencyId: agencyUser.agencyId
-            }
-        });
-
-        if (!branch)
-            throw new Error("Branch not found");
     }
 
-    throw new Error(
-        "Guide assignment is not implemented. The current schema does not contain a Guide model."
-    );
+    if (!data.branchId) {
+        throw new Error("Please select a branch.");
+    }
+
+    const branch = await db.branch.findFirst({
+        where: {
+            id: data.branchId,
+            agencyId: agencyUser.agencyId
+        },
+        select: {
+            id: true,
+            name: true
+        }
+    });
+
+    if (!branch) {
+        throw new Error("Branch not found");
+    }
+
+    const guide = await db.guideProfile.findFirst({
+        where: {
+            id: guideId,
+            agencyId: agencyUser.agencyId
+        }
+    });
+
+    if (!guide) {
+        throw new Error("Guide not found");
+    }
+
+    if (guide.branchId === data.branchId) {
+        throw new Error("Guide is already assigned to this branch");
+    }
+
+    const updatedGuide = await db.guideProfile.update({
+        where: {
+            id: guide.id
+        },
+        data: {
+            branchId: data.branchId
+        },
+        include: {
+            branch: {
+                select: {
+                    id: true,
+                    name: true
+                }
+            }
+        }
+    });
+
+    const updatedBranch = await db.branch.findMany({
+        where: {
+            id: branch.id
+        },
+        select: {
+            guides: true
+        }
+    });
+
+    return {
+        updatedGuide,
+        updatedBranch
+    };
 }
 
 export const assignPackageToBranchService = async (

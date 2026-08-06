@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { db } from "@funtush/database";
 import type { BookingStatus, Prisma } from "@funtush/database";
 import { resolveGuideIdentity, toDateOnly, startOfUtcDay, trekEndDate, toNumber } from "./mobile.service";
+import { httpError } from "../utils/httpError";
+import { stableStringify } from "../utils/stableStringify";
 
 /**
  * ── Offline itinerary caching contract (Mobile week · Day 2) ─────────────────
@@ -69,21 +71,13 @@ export const AGENCY_WIDE_ROLES: readonly string[] = ["AGENCY_ADMIN", "AGENCY_MOD
 
 /* ── Errors ──────────────────────────────────────────────────────────────── */
 
-/** An `Error` that also carries the HTTP status the controller should send. */
-export interface HttpError extends Error {
-  status: number;
-}
-
 /**
- * Build an error the controller can turn straight into a response.
- * Keeping status codes next to the rule that produced them means the controller
- * never has to guess why something failed.
+ * `httpError` used to be defined here. It moved to `utils/httpError.ts` on Day 3
+ * when the device-token service needed the same helper; re-exporting keeps every
+ * existing `import { httpError } from "./offlinePackage.service"` working.
  */
-export function httpError(status: number, message: string): HttpError {
-  const error = new Error(message) as HttpError;
-  error.status = status;
-  return error;
-}
+export { httpError };
+export type { HttpError } from "../utils/httpError";
 
 /* ── Actor ───────────────────────────────────────────────────────────────── */
 
@@ -194,18 +188,13 @@ export interface OfflinePackage {
  * two `select` fields the string would change even though the data did not —
  * and every phone in the field would be told to redownload. Sorting the keys
  * removes that whole class of false positives.
+ *
+ * The implementation moved to `utils/stableStringify.ts` on Day 4, when the
+ * emergency-number directory needed it *without* also pulling in
+ * `@funtush/database` through this file. Re-exported so every existing
+ * `import { stableStringify } from "./offlinePackage.service"` keeps working.
  */
-export function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
-
-  const entries = Object.entries(value as Record<string, unknown>)
-    // Arrays keep their order (an itinerary is ordered); object keys do not.
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([key, val]) => `${JSON.stringify(key)}:${stableStringify(val)}`);
-
-  return `{${entries.join(",")}}`;
-}
+export { stableStringify };
 
 /**
  * SHA-256 of the bundle's content, as hex.
