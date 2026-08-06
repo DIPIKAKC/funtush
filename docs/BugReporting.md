@@ -165,7 +165,7 @@ Marks a bug as resolved, stores the resolution note, and notifies the reporting 
 ## 5. Data Model
 
 ### Models
-- `BugReport` (updated)
+- `BugReport` 
 - `BugHint`
 
 ### Enums
@@ -189,6 +189,153 @@ Marks a bug as resolved, stores the resolution note, and notifies the reporting 
 
 **Result**
 -  Passed
+
+# DAY 3 — API Key Management (Large Tier)
+ 
+## Overview
+ 
+Implemented the API Key Management module, allowing Large tier agencies to generate, manage, and authenticate external API requests using scoped API keys. Keys are cryptographically hashed, shown once at creation, and support read-only and read-write scopes. The middleware validates keys, respects scope restrictions, and tracks usage via `lastUsedAt` timestamps.
+ 
+## 1. API Key Creation
+ 
+### 1.1 Generate API Key
+ 
+**`POST /agencies/me/api-keys`**
+ 
+Allows AGENCY_ADMIN users to generate a new API key for external service authentication.
+ 
+#### Validation
+- Requires AGENCY_ADMIN role
+- Agency must have LARGE subscription tier
+- `name` must be non-empty after trimming
+- `scope` must be either `READ_ONLY` or `READ_WRITE`
+#### Processing
+- Trims name before persisting
+- Generates 32-byte random secret → `funtush_live_{hex}`
+- Creates key hash using `hashToken()` for storage
+- Returns raw key **once only** at creation
+- Creates key prefix (first 20 chars) for dashboard display
+- Defaults scope to `READ_ONLY` if omitted
+#### Security
+- Raw key never stored in database
+- Only `keyHash` persisted for verification
+- Key is never returned on subsequent list calls
+- Prefix shown in dashboard for identification without exposing full key
+#### Implementation
+- `apps/api/src/services/apiKey.service.ts` → `createApiKey`
+- `apps/api/src/controllers/apiKey.controller.ts` → `createApiKeyController`
+- `apps/api/src/routes/apiKey.routes.ts`
+## 2. API Key Management
+ 
+### 2.1 List Agency Keys
+ 
+**`GET /agencies/me/api-keys`**
+ 
+Returns all API keys for the authenticated agency (AGENCY_ADMIN only).
+ 
+#### Tenant Isolation
+- Queries scoped to `req.user.agencyId`
+- Never exposes `keyHash` or raw key
+- Includes `keyPrefix`, `scope`, `lastUsedAt`, `revoked` status
+#### Ordering
+- Descending creation order (newest first)
+#### Implementation
+- `apps/api/src/services/apiKey.service.ts` → `listApiKeys`
+- `apps/api/src/controllers/apiKey.controller.ts` → `listApiKeysController`
+### 2.2 Revoke API Key
+ 
+**`DELETE /agencies/me/api-keys/:id`**
+ 
+Instantly revokes an API key, preventing further authentication.
+ 
+#### Validation
+- Key must exist
+- Key must belong to authenticated agency (403 if different)
+- Cannot revoke already revoked key (409)
+#### Processing
+- Sets `revoked: true`
+- No transition period — revocation is immediate
+- Revoked keys return `null` on authentication
+#### Implementation
+- `apps/api/src/services/apiKey.service.ts` → `revokeApiKey`
+- `apps/api/src/controllers/apiKey.controller.ts` → `revokeApiKeyController`
+## 3. API Key Authentication & Middleware
+ 
+### 3.1 Authenticate Requests
+ 
+**Middleware: `requireApiKey`**
+ 
+Validates incoming API requests using the `X-Api-Key` header.
+ 
+#### Processing
+- Extracts raw key from `X-Api-Key` header
+- Hashes key with `hashToken()` for comparison
+- Looks up key in database by `keyHash`
+- Validates key is active (not revoked)
+- Attaches `{ agencyId, scope, keyId }` to `req.apiKeyAuth`
+- Updates `lastUsedAt` timestamp (awaited for test reliability)
+#### Error Handling
+- 401 if header missing
+- 401 if key not found or revoked
+- 403 if scope insufficient for requested operation
+#### Scope Enforcement
+- Use `requireWriteScope` middleware for write operations
+- READ_ONLY keys blocked from POST/PATCH/DELETE
+- READ_WRITE keys allowed all operations
+#### Implementation
+- `apps/api/src/middleware/apiKeyAuth.middleware.ts` → `requireApiKey`, `requireWriteScope`
+### 3.2 Scope Validation
+ 
+**`function requireWriteScope(req, res, next)`**
+ 
+Middleware to enforce READ_WRITE scope on write operations.
+ 
+#### Processing
+- Checks `req.apiKeyAuth?.scope !== 'READ_WRITE'`
+- Returns 403 if insufficient scope
+- Proceeds to next middleware if authorized
+#### Usage
+```typescript
+router.post('/resource', requireApiKey, requireWriteScope, controllerFn);
+```
+ 
+## 4. Data Model
+ 
+### Models
+- `ApiKey`
+### Schema Fields
+- `id` — unique identifier
+- `agencyId` — foreign key to agency
+- `keyHash` — bcrypt-style hash of raw key (stored, never raw key)
+- `keyPrefix` — first 20 chars of key for dashboard display
+- `scope` — `READ_ONLY | READ_WRITE`
+- `name` — agency-provided label
+- `createdAt` — timestamp of key creation
+- `lastUsedAt` — timestamp of last successful authentication (null until first use)
+- `revoked` — boolean; true when revoked
+### Enums
+- `ApiKeyScope = READ_ONLY | READ_WRITE`
+### Migration
+- `20260805120000_add_api_keys`
+
+## 6. Testing Summary
+
+**Test files**
+- `apps/api/src/test/bugReporting/apiKey.service.test.ts`
+- `apps/api/src/test/bugReporting/apiKey.integration.test.ts`
+
+**Covered Tests**
+- API key creation and validation
+- API key listing and ordering
+- API key revocation
+- API key authentication
+- Scope enforcement (READ_ONLY / READ_WRITE)
+- Tier restriction (LARGE tier only)
+- Security (key shown once, keyHash hidden, lastUsedAt updates)
+- Integration workflow (create, list, revoke, authenticate)
+
+**Result**
+-  Passed 
 
 ## Environment Variables
 
