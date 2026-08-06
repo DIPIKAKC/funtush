@@ -5,6 +5,7 @@ interface CreateBranchPayload {
     address: string;
     phone: string;
     whatsapp?: string;
+    managerStaffId?: string;
     isHeadOffice?: boolean;
 }
 
