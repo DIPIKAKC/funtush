@@ -1,0 +1,202 @@
+openapi: 3.0.3
+info:
+  title: Funtush Public API
+  version: "1.0"
+  description: >
+    Read-only v1 public API for connecting third-party tools (accounting software,
+    custom reporting dashboards, CRM systems) to your Funtush agency data.
+    Available to Large tier agencies only. Generate and manage API keys from
+    your agency dashboard under Settings → API Keys.
+
+servers:
+  - url: https://api.funtush.com/public-api/v1
+    description: Production
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: >
+        Your agency's API key, generated from the dashboard. Shown only once at
+        creation. Keys have a scope of READ_ONLY or READ_WRITE — this v1 API is
+        read-only, so either scope works for all current endpoints.
+
+  schemas:
+    Package:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        pricePerPerson:
+          type: number
+        durationDays:
+          type: integer
+        difficulty:
+          type: string
+        status:
+          type: string
+          enum: [PUBLISHED]
+        createdAt:
+          type: string
+          format: date-time
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        groupSize:
+          type: integer
+        totalPrice:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+
+    PaginatedPackages:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Package"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    PaginatedBookings:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Booking"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 20
+    StatusParam:
+      name: status
+      in: query
+      description: Optional booking status filter.
+      schema:
+        type: string
+
+  headers:
+    RateLimitLimit:
+      description: Maximum requests allowed in the current window.
+      schema:
+        type: integer
+    RateLimitRemaining:
+      description: Requests remaining in the current window.
+      schema:
+        type: integer
+    RateLimitReset:
+      description: Seconds until the rate limit window resets.
+      schema:
+        type: integer
+
+paths:
+  /packages:
+    get:
+      summary: List published packages
+      description: Returns published packages belonging to the authenticated agency, paginated.
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: A paginated list of packages.
+          headers:
+            X-RateLimit-Limit: { $ref: "#/components/headers/RateLimitLimit" }
+            X-RateLimit-Remaining: { $ref: "#/components/headers/RateLimitRemaining" }
+            X-RateLimit-Reset: { $ref: "#/components/headers/RateLimitReset" }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data: { $ref: "#/components/schemas/PaginatedPackages" }
+        "401":
+          description: Missing or invalid API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: Rate limit exceeded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /bookings:
+    get:
+      summary: List bookings
+      description: Returns bookings belonging to the authenticated agency, paginated, optionally filtered by status.
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/StatusParam"
+      responses:
+        "200":
+          description: A paginated list of bookings.
+          headers:
+            X-RateLimit-Limit: { $ref: "#/components/headers/RateLimitLimit" }
+            X-RateLimit-Remaining: { $ref: "#/components/headers/RateLimitRemaining" }
+            X-RateLimit-Reset: { $ref: "#/components/headers/RateLimitReset" }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data: { $ref: "#/components/schemas/PaginatedBookings" }
+        "401":
+          description: Missing or invalid API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: Rate limit exceeded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }

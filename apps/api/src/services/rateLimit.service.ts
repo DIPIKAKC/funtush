@@ -64,3 +64,36 @@ export async function checkRateLimit(
     return { allowed: true, remaining: 1, resetInSec: 60, limit: config.maxRequests };
   }
 }
+
+export const PUBLIC_API_RATE_LIMITS: Record<string, RateLimitConfig> = {
+  DEFAULT: { maxRequests: 60, windowSecs: 60 }, 
+};
+
+export async function checkPublicApiRateLimit(
+  apiKeyId: string,
+  method: string,
+  path: string
+): Promise<RateLimitResult> {
+  const config = PUBLIC_API_RATE_LIMITS["DEFAULT"];
+  const redisKey = `ratelimit:public-api:${apiKeyId}:${method.toUpperCase()}:${path}`;
+
+  try {
+    const count = await redis.incr(redisKey);
+    if (count === 1) {
+      await redis.expire(redisKey, config.windowSecs);
+    }
+    const ttl = await redis.ttl(redisKey);
+    const remaining = Math.max(0, config.maxRequests - count);
+    const allowed = count <= config.maxRequests;
+
+    return {
+      allowed,
+      remaining,
+      resetInSec: ttl > 0 ? ttl : config.windowSecs,
+      limit: config.maxRequests,
+    };
+  } catch (err) {
+    console.error("[RateLimit] Public API Redis error, failing open:", err);
+    return { allowed: true, remaining: 1, resetInSec: 60, limit: config.maxRequests };
+  }
+}
