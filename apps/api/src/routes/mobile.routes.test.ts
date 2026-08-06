@@ -541,11 +541,160 @@ describe("DELETE /mobile/register-device", () => {
   });
 });
 
+describe("GET /mobile/emergency-numbers", () => {
+  const url = (suffix = "") => `${baseUrl}/mobile/emergency-numbers${suffix}`;
+
+  it("401s without a token", async () => {
+    const res = await fetch(url());
+    expect(res.status).toBe(401);
+  });
+
+  it("returns the full table for any authenticated role", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+
+    const res = await fetch(url());
+    const body = (await res.json()) as {
+      version: number;
+      checksum: string;
+      countryCount: number;
+      filtered: boolean;
+      countries: { countryCode: string }[];
+    };
+
+    expect(res.status).toBe(200);
+    expect(body.filtered).toBe(false);
+    expect(body.countries.length).toBe(body.countryCount);
+    expect(body.countries.some((c) => c.countryCode === "NP")).toBe(true);
+    expect(body.checksum).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("is open to a guide too — the safety table has no role dimension", async () => {
+    authState.user = {
+      userId: "user-7",
+      role: "GUIDE",
+      roleType: "TENANT",
+      agencyId: "agency-1",
+    };
+
+    const res = await fetch(url());
+    expect(res.status).toBe(200);
+  });
+
+  it("is cacheable by shared caches, unlike every other /mobile route", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+
+    const res = await fetch(url());
+
+    // `public`, not `private`: this body is identical for every caller and holds
+    // no personal data, so an edge cache serving it to thousands of phones is a
+    // feature rather than a leak.
+    expect(res.headers.get("cache-control")).toBe(
+      "public, max-age=86400, stale-while-revalidate=604800"
+    );
+    expect(res.headers.get("etag")).toBe('"ev1"');
+  });
+
+  it("304s a client that already has this version", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+
+    const viaHeader = await fetch(url(), { headers: { "If-None-Match": '"ev1"' } });
+    expect(viaHeader.status).toBe(304);
+    expect(await viaHeader.text()).toBe("");
+
+    const viaQuery = await fetch(url("?knownVersion=1"));
+    expect(viaQuery.status).toBe(304);
+  });
+
+  it("sends the table when the client's cached version is behind", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+
+    const res = await fetch(url("?knownVersion=0"));
+    expect(res.status).toBe(200);
+  });
+
+  it("filters to the requested countries and says so in the body and the ETag", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+
+    const res = await fetch(url("?countries=np,IN"));
+    const body = (await res.json()) as {
+      filtered: boolean;
+      countryCount: number;
+      countries: { countryCode: string }[];
+    };
+
+    expect(res.status).toBe(200);
+    expect(body.countries.map((c) => c.countryCode)).toEqual(["IN", "NP"]);
+    expect(body.filtered).toBe(true);
+    // Still reports the size of the whole directory, so the app can tell
+    // "I have 2 of 57" from "I have all 57".
+    expect(body.countryCount).toBeGreaterThan(2);
+    // The filter is part of the cache key — otherwise a cache could serve this
+    // two-country reply to a client that asked for everything.
+    expect(res.headers.get("etag")).toBe('"ev1+IN,NP"');
+  });
+
+  it("400s a filter longer than the endpoint accepts", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+
+    const tooMany = "AA,AB,AC,AD,AE,AF,AG,AH,AI,AJ,AK";
+    const res = await fetch(url(`?countries=${tooMany}`));
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toContain("at most");
+  });
+});
+
+describe("GET /mobile/emergency-numbers/version", () => {
+  const url = () => `${baseUrl}/mobile/emergency-numbers/version`;
+
+  it("401s without a token", async () => {
+    const res = await fetch(url());
+    expect(res.status).toBe(401);
+  });
+
+  it("returns just the probe envelope and forbids caching the answer", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+
+    const res = await fetch(url());
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("public, no-cache");
+    expect(Object.keys(body).sort()).toEqual([
+      "checksum",
+      "countryCount",
+      "updatedAt",
+      "version",
+    ]);
+    // No country list — that is the entire point of the probe.
+    expect(body.countries).toBeUndefined();
+  });
+
+  it("is not swallowed by the /emergency-numbers route above it", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+
+    const res = await fetch(url());
+    const body = (await res.json()) as Record<string, unknown>;
+
+    // If Express had matched the broader route, this would be the full table.
+    expect(body.countries).toBeUndefined();
+    expect(body.filtered).toBeUndefined();
+  });
+
+  it("does not 304 — a freshness probe must always answer", async () => {
+    authState.user = { userId: "user-1", role: "TREKKER", roleType: "TREKKER" };
+
+    const res = await fetch(url(), { headers: { "If-None-Match": '"ev1"' } });
+    expect(res.status).toBe(200);
+  });
+});
+
 describe("route guards", () => {
   it("locks each route to the roles that own it", () => {
-    // Four entries, not six: the two device routes carry `requireAuth` only.
-    // Registering your own phone for push is not an agency-data question, so
-    // there is no role dimension to guard — see the comment in mobile.routes.ts.
+    // Four entries, not eight: the two device routes and the two emergency
+    // number routes carry `requireAuth` only. Registering your own phone for
+    // push, and knowing what to dial in Nepal, are not agency-data questions —
+    // there is no role dimension to guard. See the comments in mobile.routes.ts.
     expect(guardedRoles).toEqual([
       ["TREKKER"],
       ["GUIDE", "STAFF"],
