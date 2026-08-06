@@ -1,21 +1,20 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { db } from '@funtush/database';
-import { generateAccessToken } from '@funtush/auth';
 import { createApiKey, listApiKeys, revokeApiKey, authenticateApiKey, ApiKeyError } from '../../services/apiKey.service';
 
 describe('API Key Integration Tests', () => {
   const mockTierId = 'tier_int_' + Date.now();
   const mockAgencyId = 'agency_int_' + Date.now();
   const userId = 'user_int_' + Date.now();
+  
 
-  let authToken: string;
-  let createdKeyId: string;
-  let createdRawKey: string;
 
   beforeAll(async () => {
     process.env.JWT_ACCESS_SECRET = 'test-jwt-access-secret-integration-tests';
     process.env.JWT_REFRESH_SECRET = 'test-jwt-refresh-secret-integration-tests';
 
+    // Clean up any leftover data from previous runs
+    // Delete agencies first to avoid foreign key violations
     const largeTier = await db.subscriptionTier.findFirst({ where: { name: 'LARGE' } });
     if (largeTier) {
       await db.agency.deleteMany({ where: { tierId: largeTier.id } });
@@ -61,12 +60,7 @@ describe('API Key Integration Tests', () => {
       },
     });
 
-    authToken = generateAccessToken({
-      userId,
-      agencyId: mockAgencyId,
-      role: 'AGENCY_ADMIN',
-      roleType: 'TENANT'
-    });
+
   });
 
   afterAll(async () => {
@@ -83,9 +77,6 @@ describe('API Key Integration Tests', () => {
       expect(created.id).toBeDefined();
       expect(created.key).toMatch(/^funtush_live_/);
 
-      createdKeyId = created.id;
-      createdRawKey = created.key;
-
       const listed = await listApiKeys(mockAgencyId);
       const listedKey = listed.find(k => k.id === created.id);
       expect(listedKey).toBeDefined();
@@ -93,7 +84,7 @@ describe('API Key Integration Tests', () => {
       const revoked = await revokeApiKey(created.id, mockAgencyId);
       expect(revoked.revoked).toBe(true);
 
-      const auth = await authenticateApiKey(createdRawKey);
+      const auth = await authenticateApiKey(created.key);
       expect(auth).toBeNull();
     });
 

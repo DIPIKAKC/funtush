@@ -1,14 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { authenticateApiKey } from "../services/apiKey.service";
 
-declare global {
-  namespace Express {
-    interface Request {
-      apiKeyAuth?: { agencyId: string; scope: "READ_ONLY" | "READ_WRITE"; keyId: string };
-    }
-  }
-}
-
 export async function requireApiKey(req: Request, res: Response, next: NextFunction) {
   const rawKey = req.headers["x-api-key"];
   if (!rawKey || typeof rawKey !== "string") {

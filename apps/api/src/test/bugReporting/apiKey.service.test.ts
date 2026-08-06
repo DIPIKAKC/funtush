@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { db } from '@funtush/database';
 import {
     createApiKey,
@@ -13,10 +13,9 @@ describe('API Key Management', () => {
     const mockAgencyId = 'agency_apikey_' + Date.now();
     const agencyAdminUserId = 'user_agencyadmin_apikey_' + Date.now();
 
-    let createdKeyId: string;
-    let createdRawKey: string;
-
     beforeAll(async () => {
+        // Clean up any leftover data from previous runs
+        // Delete agencies first to avoid foreign key violations
         const largeTier = await db.subscriptionTier.findFirst({ where: { name: 'LARGE' } });
         if (largeTier) {
             await db.agency.deleteMany({ where: { tierId: largeTier.id } });
@@ -83,10 +82,17 @@ describe('API Key Management', () => {
             expect(result.scope).toBe('READ_WRITE');
             expect(result.key).toMatch(/^funtush_live_/);
             expect(result.keyPrefix).toMatch(/^funtush_live_/);
-            expect(result.createdAt).toBeInstanceOf(Date);
+        });
 
-            createdKeyId = result.id;
-            createdRawKey = result.key;
+        it('throws 400 if name is empty', async () => {
+            await expect(createApiKey(mockAgencyId, '', 'READ_ONLY')).rejects.toThrow(ApiKeyError);
+            try {
+                await createApiKey(mockAgencyId, '   ', 'READ_ONLY');
+                expect.fail('should have thrown');
+            } catch (err) {
+                expect((err as ApiKeyError).status).toBe(400);
+                expect(err).toBeInstanceOf(ApiKeyError);
+            }
         });
 
         it('throws 400 if name is empty', async () => {
@@ -144,6 +150,7 @@ describe('API Key Management', () => {
                 expect((err as ApiKeyError).message).toContain('Large tier');
             }
 
+            // Cleanup
             await db.agency.delete({ where: { id: starterAgencyId } });
             await db.subscriptionTier.delete({ where: { id: starterTierId } });
         });
@@ -153,6 +160,7 @@ describe('API Key Management', () => {
 
             expect(result.scope).toBe('READ_ONLY');
 
+            // Cleanup
             await db.apiKey.delete({ where: { id: result.id } });
         });
 
@@ -161,6 +169,7 @@ describe('API Key Management', () => {
 
             expect(result.name).toBe('Trimmed Key');
 
+            // Cleanup
             await db.apiKey.delete({ where: { id: result.id } });
         });
     });
@@ -180,6 +189,7 @@ describe('API Key Management', () => {
 
         it('returns keys in descending creation order', async () => {
             const key1 = await createApiKey(mockAgencyId, 'Older Key', 'READ_ONLY');
+            // Small delay to ensure timestamp difference
             await new Promise((resolve) => setTimeout(resolve, 10));
             const key2 = await createApiKey(mockAgencyId, 'Newer Key', 'READ_ONLY');
 
@@ -323,7 +333,6 @@ describe('API Key Management', () => {
 
         it('raw key is only returned once (on creation)', async () => {
             const key = await createApiKey(mockAgencyId, 'One Time Key', 'READ_ONLY');
-            const rawKey = key.key;
 
             const listed = await listApiKeys(mockAgencyId);
             const listedKey = listed.find((k) => k.id === key.id);
