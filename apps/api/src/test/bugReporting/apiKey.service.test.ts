@@ -7,7 +7,6 @@ import {
     authenticateApiKey,
     ApiKeyError,
 } from '../../services/apiKey.service';
-import { ensureLargeTier } from './largeTier';
 
 describe('API Key Management', () => {
     let mockTierId = 'tier_apikey_' + Date.now();
@@ -38,7 +37,7 @@ describe('API Key Management', () => {
                 name: 'API Key Test Agency',
                 email: 'apikey_' + Date.now() + '@test.com',
                 slug: 'apikey-agency-' + Date.now(),
-                tierId: largeTierId,
+                tierId: mockTierId,
             },
         });
 
