@@ -5,8 +5,9 @@ info:
   description: >
     Read-only v1 public API for connecting third-party tools (accounting software,
     custom reporting dashboards, CRM systems) to your Funtush agency data.
-    Available to Large tier agencies only. Generate and manage API keys from
-    your agency dashboard under Settings → API Keys.
+    Available to Large tier agencies only. Requests are scoped to the authenticated
+    agency and rate-limited separately from internal API traffic. Generate and manage
+    API keys from your agency dashboard under Settings → API Keys.
 
 servers:
   - url: https://api.funtush.com/public-api/v1
@@ -23,8 +24,9 @@ components:
       name: X-Api-Key
       description: >
         Your agency's API key, generated from the dashboard. Shown only once at
-        creation. Keys have a scope of READ_ONLY or READ_WRITE — this v1 API is
-        read-only, so either scope works for all current endpoints.
+        creation. Requests are scoped to the key's agency. Keys have a scope of
+        READ_ONLY or READ_WRITE — this v1 API is read-only, so either scope
+        works for all current endpoints.
 
   schemas:
     Package:
@@ -139,7 +141,7 @@ paths:
   /packages:
     get:
       summary: List published packages
-      description: Returns published packages belonging to the authenticated agency, paginated.
+      description: Returns published packages belonging to the authenticated agency, paginated and rate-limited separately from internal API traffic.
       parameters:
         - $ref: "#/components/parameters/PageParam"
         - $ref: "#/components/parameters/LimitParam"
@@ -171,7 +173,7 @@ paths:
   /bookings:
     get:
       summary: List bookings
-      description: Returns bookings belonging to the authenticated agency, paginated, optionally filtered by status.
+      description: Returns bookings belonging to the authenticated agency, paginated, optionally filtered by status, and rate-limited separately from internal API traffic.
       parameters:
         - $ref: "#/components/parameters/PageParam"
         - $ref: "#/components/parameters/LimitParam"
