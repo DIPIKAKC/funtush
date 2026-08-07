@@ -172,6 +172,7 @@ model Agency {
   users             AgencyUser[]
   agencyStaffs      AgencyStaff[]
   profile           AgencyProfile?
+  branding          AgencyBranding?
   kyc               KycSubmission?
   subscriptions     Subscription[]
   packages          TrekPackage[]
@@ -1496,4 +1497,89 @@ model ApiKey {
 
   @@index([agencyId])
   @@map("api_keys")
+}
+
+/// Aspect ratio every package-card thumbnail on the white-label site is cropped
+/// to. One setting per agency, not per package, so a listing page never shows a
+/// ragged mix of shapes. Prisma enum values cannot start with a digit, hence the
+/// `RATIO_` prefix.
+enum CardImageRatio {
+  RATIO_1_1
+  RATIO_4_3
+  RATIO_16_9
+}
+
+/// How a price is written on the white-label site: `Rs 1,200`, `NPR 1,200`, or
+/// `Rs 1,200 NPR`. Agencies selling to foreign trekkers usually want the code
+/// (unambiguous); agencies selling locally want the symbol (shorter).
+enum CurrencyDisplay {
+  SYMBOL
+  CODE
+  SYMBOL_CODE
+}
+
+/// ── Brand identity for one agency's white-label site (White-label week · Day 1)
+///
+/// Deliberately a table of its own rather than more columns on `AgencyProfile`,
+/// for three reasons:
+///
+///   1. **Different reader.** `AgencyProfile` is read by the dashboard when a
+///      staff member opens a settings page. This row is read by the *public*
+///      site renderer on every page view, by anonymous visitors. Keeping it
+///      separate means that hot, cacheable read never drags a profile full of
+///      widget access tokens (`instagramAccessToken`, `liveChatCode`) into
+///      memory — the safest way to not leak a secret is to not load it.
+///   2. **Different lifecycle.** Branding is edited by one person once and then
+///      basically never; widget settings churn. Separate rows mean separate
+///      `updatedAt`, which is what lets the renderer cache by timestamp.
+///   3. **Optional by design.** A brand-new agency has no branding row at all
+///      and the site still renders, from `DEFAULT_BRANDING`. A nullable row is
+///      an honest way to say "never configured", which a table of nullable
+///      columns bolted onto an existing row cannot say.
+model AgencyBranding {
+  id       String @id @default(uuid())
+  agencyId String @unique @map("agency_id")
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  /// Trading name shown in the site header and the browser tab. Falls back to
+  /// `Agency.name` (the legal/registered name) when unset — the two differ more
+  /// often than you would think ("Himalayan Trails Pvt. Ltd." vs "Himalayan
+  /// Trails").
+  brandName String? @map("brand_name")
+
+  /// CDN URL of the header logo. Accepted at exactly 725×145 px — see
+  /// `LOGO_SPEC` in `apps/api/src/data/brandTheme.ts` for why the size is fixed.
+  logoUrl String? @map("logo_url")
+
+  /// CDN URL of the browser-tab icon, accepted at exactly 96×96 px.
+  faviconUrl String? @map("favicon_url")
+
+  /// Primary brand colour as an uppercase 6-digit hex string, e.g. `#0F766E`.
+  primaryColor String? @map("primary_color")
+
+  /// Which curated swatch `primaryColor` came from, or `null` when the agency
+  /// picked a free-form colour. Stored so the settings UI can re-select the
+  /// right swatch, and so a downgrade to SMALL can tell "this is one of ours"
+  /// from "this needs re-picking".
+  paletteId String? @map("palette_id")
+
+  /// Font family key from the `BRAND_FONTS` whitelist (not a raw CSS value —
+  /// see the service for why a free-text font is an injection hole).
+  fontFamily String? @map("font_family")
+
+  cardImageRatio CardImageRatio @default(RATIO_4_3) @map("card_image_ratio")
+
+  /// ISO 4217 code, e.g. `NPR`. Drives the default symbol.
+  currencyCode String @default("NPR") @map("currency_code")
+
+  /// Overrides the symbol from the currency table when an agency insists on a
+  /// different glyph (`रु` instead of `Rs`). `null` ⇒ use the table's symbol.
+  currencySymbol String? @map("currency_symbol")
+
+  currencyDisplay CurrencyDisplay @default(SYMBOL) @map("currency_display")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("agency_branding")
 }
