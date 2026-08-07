@@ -337,6 +337,183 @@ router.post('/resource', requireApiKey, requireWriteScope, controllerFn);
 **Result**
 -  Passed 
 
+# DAY 4 — Public API Surface (Read-Only v1)
+
+## Overview
+
+Implemented the public API surface for connected third-party tools, exposing read-only access to agency data through API-key authentication. Requests are scoped to the authenticated agency, rate-limited separately from internal API traffic, and documented with an OpenAPI stub for agency reference.
+
+## 1. Public API Endpoints
+
+### 1.1 List Published Packages
+
+**`GET /public-api/v1/packages`**
+
+Returns the authenticated agency's published trek packages, paginated and ordered newest first.
+
+#### Validation
+- Requires a valid API key in the `X-Api-Key` header
+- Agency must own the packages being requested
+- Current v1 endpoints are read-only, so both `READ_ONLY` and `READ_WRITE` keys can access them
+
+#### Processing
+- Uses `req.apiKeyAuth.agencyId` to scope results to the authenticated agency
+- Returns only `PUBLISHED` packages
+- Never exposes draft packages or other agencies' data
+- Includes pagination metadata in the response
+
+#### Implementation
+- `apps/api/src/services/publicApi.service.ts` → `listPublicPackages`
+- `apps/api/src/controllers/publicApi.controller.ts` → `listPublicPackagesController`
+- `apps/api/src/routes/publicApi.routes.ts`
+
+### 1.2 List Bookings
+
+**`GET /public-api/v1/bookings`**
+
+Returns bookings belonging to the authenticated agency, paginated and optionally filtered by booking status.
+
+#### Validation
+- Requires a valid API key in the `X-Api-Key` header
+- Agency must own the bookings being requested
+- Current v1 endpoints are read-only, so both `READ_ONLY` and `READ_WRITE` keys can access them
+
+#### Processing
+- Uses `req.apiKeyAuth.agencyId` to scope results to the authenticated agency
+- Supports optional status filtering
+- Returns booking metadata without trekker PII
+- Includes pagination metadata in the response
+
+#### Implementation
+- `apps/api/src/services/publicApi.service.ts` → `listPublicBookings`
+- `apps/api/src/controllers/publicApi.controller.ts` → `listPublicBookingsController`
+- `apps/api/src/routes/publicApi.routes.ts`
+
+## 2. Rate Limiting
+
+### 2.1 Separate Public API Limits
+
+**Middleware: `publicApiRateLimit`**
+
+Applies rate limits independently from the internal API so third-party usage does not affect internal request traffic.
+
+#### Processing
+- Tracks requests per API key, method, and path
+- Emits `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers
+- Fails open if Redis is unavailable so public API traffic is not blocked by cache outages
+
+#### Implementation
+- `apps/api/src/services/rateLimit.service.ts` → `checkPublicApiRateLimit`
+- `apps/api/src/middleware/publicApiRateLimit.middleware.ts` → `publicApiRateLimit`
+
+## 3. OpenAPI Documentation
+
+### 3.1 Agency Reference Stub
+
+**`docs/public-api-openapi.yaml`**
+
+Provides a documentation stub for agency reference and third-party integration planning.
+
+#### Coverage
+- `ApiKeyAuth` security scheme using the `X-Api-Key` header
+- `/packages` and `/bookings` response shapes
+- Pagination parameters and rate limit response headers
+- Read-only v1 description for external consumers
+
+## 4. Data Model
+
+### Models
+- `TrekPackage`
+- `Booking`
+- `ApiKey`
+
+### Notes
+- Public API responses are scoped to the authenticated agency
+- Package responses only include published records
+- Booking responses include operational metadata without trekker PII
+
+## 5. Testing Summary
+
+**Test file**
+- `apps/api/src/test/bugReporting/publicApi.test.ts`
+
+**Covered Tests**
+- Agency-scoped packages and bookings
+- Read-only public API behavior
+- Separate public API rate limiting
+- OpenAPI-aligned response shape
+
+**Result**
+- Passed
+
+# DAY 5 — Testing
+
+## Overview
+
+Verified the bug lifecycle, API key lifecycle, public API scope behavior, and tier-based API key restrictions. The targeted bug-reporting and API-key suites pass end to end.
+
+## 1. Bug Lifecycle
+
+### 1.1 Submit -> Assign -> Hint -> Resolve
+
+**Covered Flow**
+- Bug submission creates a `REPORTED` bug
+- Assignment moves the bug to `IN_PROGRESS` when appropriate
+- Hint creation attaches agency-visible guidance and triggers notification delivery
+- Resolution updates the bug to `RESOLVED` and notifies the reporting agency
+
+#### Notifications
+- Email notifications fire when hints are added and when bugs are resolved
+- Push notifications fire on resolution when an FCM token is present
+- Notification service calls are mocked in the test suite so the flow stays deterministic
+
+#### Test File
+- `apps/api/src/test/bugReporting/bugWorkflow.test.ts`
+
+## 2. API Key Lifecycle
+
+### 2.1 One-Time Visibility and Revocation
+
+**Covered Behavior**
+- API keys are shown only once at creation
+- Subsequent list calls never expose the raw key again
+- `keyHash` is never returned to the client
+- Revocation cuts off authentication immediately
+- `lastUsedAt` updates on successful authentication
+
+#### Test Files
+- `apps/api/src/test/bugReporting/apiKey.service.test.ts`
+- `apps/api/src/test/bugReporting/apiKey.integration.test.ts`
+
+## 3. Public API Scope
+
+### 3.1 Scope-Aware Access
+
+**Covered Behavior**
+- Public API requests authenticate through API keys tied to a single agency
+- Read-only v1 endpoints work for both `READ_ONLY` and `READ_WRITE` keys as documented
+- Scope metadata is preserved on authentication for future write-guarded endpoints
+
+#### Test File
+- `apps/api/src/test/bugReporting/publicApi.test.ts`
+
+## 4. Tier Access Control
+
+### 4.1 Large Tier Only
+
+**Covered Behavior**
+- Large tier agencies can create and manage API keys
+- Small and Medium tiers cannot access API key management
+- API key creation returns `403` outside the Large tier
+
+#### Test File
+- `apps/api/src/test/bugReporting/apiKey.service.test.ts`
+
+## 5. Testing Summary
+
+**Result**
+- Passed
+
 ## Environment Variables
 
 No new environment variables were introduced. The module uses the existing database connection, upload service, email service, and push notification configuration.
@@ -363,6 +540,13 @@ npx prisma studio
 # Run bug reporting tests
 pnpm test bugReport.test.ts
 pnpm test bugWorkflow.test.ts
+
+# Run public API tests
+pnpm test publicApi.test.ts
+
+# Run API key tests
+pnpm test apiKey.service.test.ts
+pnpm test apiKey.integration.test.ts
 
 # Run all tests and lint
 pnpm test

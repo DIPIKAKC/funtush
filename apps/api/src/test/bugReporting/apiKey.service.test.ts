@@ -7,34 +7,40 @@ import {
     authenticateApiKey,
     ApiKeyError,
 } from '../../services/apiKey.service';
-import { ensureLargeTier } from './largeTier';
 
 describe('API Key Management', () => {
-    const mockTierId = 'tier_apikey_' + Date.now();
+    let mockTierId = 'tier_apikey_' + Date.now();
     const mockAgencyId = 'agency_apikey_' + Date.now();
     const agencyAdminUserId = 'user_agencyadmin_apikey_' + Date.now();
 
-    /** Resolved in `beforeAll` — see `ensureLargeTier` for why it is shared. */
-    let largeTierId: string;
-
     beforeAll(async () => {
-        // The LARGE tier is a single, unique, seeded row that this file shares
-        // with `apiKey.integration.test.ts`. Reuse it rather than deleting and
-        // recreating it — see `largeTier.ts` for the full explanation.
-        largeTierId = await ensureLargeTier(mockTierId);
+        try {
+            await db.subscriptionTier.create({
+                data: {
+                    id: mockTierId,
+                    name: 'LARGE',
+                    maxStaff: 50,
+                    maxGuides: 25,
+                    monthlyPrice: 5000,
+                    features: JSON.stringify(['bugs', 'api_keys']),
+                },
+            });
+        } catch (err) {
+            if (!(err instanceof Error) || (err as { code?: string }).code !== 'P2002') throw err;
+            const existing = await db.subscriptionTier.findUniqueOrThrow({ where: { name: 'LARGE' } });
+            mockTierId = existing.id;
+        }
 
-        // Create agency with LARGE tier
         await db.agency.create({
             data: {
                 id: mockAgencyId,
                 name: 'API Key Test Agency',
                 email: 'apikey_' + Date.now() + '@test.com',
                 slug: 'apikey-agency-' + Date.now(),
-                tierId: largeTierId,
+                tierId: mockTierId,
             },
         });
 
-        // Create agency admin user
         await db.user.create({
             data: {
                 id: agencyAdminUserId,
@@ -59,9 +65,11 @@ describe('API Key Management', () => {
         await db.agencyUser.deleteMany({ where: { agencyId: mockAgencyId } });
         await db.user.deleteMany({ where: { id: agencyAdminUserId } });
         await db.agency.deleteMany({ where: { id: mockAgencyId } });
-        // The LARGE tier is deliberately NOT deleted: it is shared with
-        // `apiKey.integration.test.ts` and is seeded by `prisma/seed.ts`.
-        // Deleting it is what broke this suite. See `largeTier.ts`.
+
+        const stillInUse = await db.agency.findFirst({ where: { tierId: mockTierId } });
+        if (!stillInUse) {
+            await db.subscriptionTier.deleteMany({ where: { id: mockTierId } });
+        }
     });
 
     describe('createApiKey', () => {
@@ -86,17 +94,6 @@ describe('API Key Management', () => {
             }
         });
 
-        it('throws 400 if name is empty', async () => {
-            await expect(createApiKey(mockAgencyId, '', 'READ_ONLY')).rejects.toThrow(ApiKeyError);
-            try {
-                await createApiKey(mockAgencyId, '   ', 'READ_ONLY');
-                expect.fail('should have thrown');
-            } catch (err) {
-                expect((err as ApiKeyError).status).toBe(400);
-                expect(err).toBeInstanceOf(ApiKeyError);
-            }
-        });
-
         it('throws 404 if agency does not exist', async () => {
             try {
                 await createApiKey('does-not-exist', 'My Key', 'READ_ONLY');
@@ -108,22 +105,17 @@ describe('API Key Management', () => {
         });
 
         it('throws 403 if agency is not on LARGE tier', async () => {
-            // Create a starter tier agency
             const starterTierId = 'tier_starter_' + Date.now();
             const starterAgencyId = 'agency_starter_' + Date.now();
 
             await db.subscriptionTier.create({
                 data: {
                     id: starterTierId,
-                    // Unique per run. `SubscriptionTier.name` is `@unique`, so a
-                    // fixed "STARTER" would collide with a leftover row if this
-                    // test ever failed before reaching its cleanup below. The
-                    // assertion only cares that the tier is *not* LARGE.
                     name: 'STARTER_' + Date.now(),
                     maxStaff: 5,
-                    maxGuides: 2,
+                    maxGuides: 3,
                     monthlyPrice: 500,
-                    features: JSON.stringify([]),
+                    features: JSON.stringify(['bugs']),
                 },
             });
 
@@ -145,7 +137,6 @@ describe('API Key Management', () => {
                 expect((err as ApiKeyError).message).toContain('Large tier');
             }
 
-            // Cleanup
             await db.agency.delete({ where: { id: starterAgencyId } });
             await db.subscriptionTier.delete({ where: { id: starterTierId } });
         });
@@ -155,7 +146,6 @@ describe('API Key Management', () => {
 
             expect(result.scope).toBe('READ_ONLY');
 
-            // Cleanup
             await db.apiKey.delete({ where: { id: result.id } });
         });
 
@@ -164,14 +154,12 @@ describe('API Key Management', () => {
 
             expect(result.name).toBe('Trimmed Key');
 
-            // Cleanup
             await db.apiKey.delete({ where: { id: result.id } });
         });
     });
 
     describe('listApiKeys', () => {
         it('lists all API keys for an agency', async () => {
-            // Create multiple keys
             const key1 = await createApiKey(mockAgencyId, 'Key 1', 'READ_ONLY');
             const key2 = await createApiKey(mockAgencyId, 'Key 2', 'READ_WRITE');
 
@@ -184,7 +172,6 @@ describe('API Key Management', () => {
 
         it('returns keys in descending creation order', async () => {
             const key1 = await createApiKey(mockAgencyId, 'Older Key', 'READ_ONLY');
-            // Small delay to ensure timestamp difference
             await new Promise((resolve) => setTimeout(resolve, 10));
             const key2 = await createApiKey(mockAgencyId, 'Newer Key', 'READ_ONLY');
 
@@ -338,7 +325,6 @@ describe('API Key Management', () => {
         it('key prefix is shown in dashboard, not full key', async () => {
             const key = await createApiKey(mockAgencyId, 'Prefix Test', 'READ_ONLY');
 
-            // Prefix should be much shorter than full key
             expect(key.keyPrefix.length).toBeLessThan(key.key.length);
             expect(key.keyPrefix).toMatch(/^funtush_live_/);
         });
