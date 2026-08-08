@@ -330,13 +330,18 @@ describe("resolveBranding", () => {
     expect(onNavy.onPrimaryColor).toBe("#FFFFFF"); // light text on navy
   });
 
-  it("keeps the 'Powered by Funtush' badge on every tier except LARGE", () => {
-    // Backend Guide §6: complete white-label is a LARGE-tier capability, and the
-    // agency side cannot switch the badge off.
-    for (const tier of ["FREE", "SMALL", "MEDIUM"]) {
-      expect(resolveBranding({ name: "A", tier }, null).poweredByFuntush).toBe(true);
-    }
-    expect(resolveBranding({ name: "A", tier: "LARGE" }, null).poweredByFuntush).toBe(false);
+  it("no longer decides the 'Powered by Funtush' badge — that moved to site config on Day 2", () => {
+    // Day 1 computed the badge here as `tier !== "LARGE"`. Day 2's task restates
+    // the rule (forced on for the Free trial, hidden on every paid tier) *and*
+    // gives the agency a stored preference, which makes it site configuration
+    // rather than theme. `resolveFuntushBadge` in `data/siteConfig.ts` is now the
+    // only implementation; this assertion is here to fail loudly if a second one
+    // ever grows back in the branding resolver.
+    const resolved = resolveBranding({ name: "A", tier: "SMALL" }, null) as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(resolved.poweredByFuntush).toBeUndefined();
   });
 
   it("reports which colour picker the tier is entitled to", () => {

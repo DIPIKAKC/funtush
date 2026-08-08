@@ -15,6 +15,7 @@ import reviewRoutes from "./routes/review.route.js";
 import couponRoutes from "./routes/coupon.route.js";
 import branchRoutes from "./routes/branches.routes.js";
 import brandingRoutes from "./routes/branding.routes.js";
+import siteConfigRoutes from "./routes/siteConfig.routes.js";
 import widgetsRoutes from "./routes/widgets/widgets.routes.js";
 import instagramRoutes from "./routes/widgets/instagram.routes.js";
 import financeRoutes from "./routes/finance.route.js";
@@ -52,6 +53,8 @@ app.use("/", couponRoutes);
 app.use("/", branchRoutes);
 // Brand identity settings + the public read the white-label renderer uses.
 app.use("/", brandingRoutes);
+// Site configuration: under-construction mode, top bar, popup, Funtush badge.
+app.use("/", siteConfigRoutes);
 app.use("/agencies/me/widgets", widgetsRoutes);
 app.use("/", instagramRoutes);
 

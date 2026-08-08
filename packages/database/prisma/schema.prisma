@@ -173,6 +173,7 @@ model Agency {
   agencyStaffs      AgencyStaff[]
   profile           AgencyProfile?
   branding          AgencyBranding?
+  siteConfig        AgencySiteConfig?
   kyc               KycSubmission?
   subscriptions     Subscription[]
   packages          TrekPackage[]
@@ -1523,4 +1524,120 @@ model AgencyBranding {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("agency_branding")
+}
+
+/// Whether the announcement bar sits still or marquees across the page.
+/// `SCROLLING` exists because a 160-character notice does not fit a phone
+/// screen; it is a rendering hint, not a second kind of bar.
+enum TopBarBehavior {
+  STATIC
+  SCROLLING
+}
+
+/// When the promotional modal opens. `AFTER_DELAY` reads `popupDelaySeconds`;
+/// the other two ignore it. `ON_EXIT_INTENT` fires when the pointer leaves
+/// toward the browser chrome — desktop only, so a renderer must fall back to
+/// `AFTER_DELAY` on touch devices.
+enum PopupTrigger {
+  ON_LOAD
+  AFTER_DELAY
+  ON_EXIT_INTENT
+}
+
+/// How often one visitor sees the modal. The *enforcement* is client-side
+/// (sessionStorage / localStorage / a cookie) because the site has no visitor
+/// identity to key on — this column only tells the renderer which bucket to use.
+enum PopupFrequency {
+  EVERY_VISIT
+  ONCE_PER_SESSION
+  ONCE_PER_DAY
+  ONCE_EVER
+}
+
+/// ── Site configuration for one agency's white-label site (White-label week · Day 2)
+///
+/// A second table beside `AgencyBranding` rather than more columns on it, and the
+/// reason is *not* the Day 1 reason (different reader — here the reader is the
+/// same public renderer). It is:
+///
+///   1. **Different question.** Branding answers "what does this site look
+///      like?" and is set once. This answers "what is this site doing right
+///      now?" — is it up, what is it announcing, what is it promoting — and
+///      changes weekly. Two `updatedAt` columns mean a colour change does not
+///      bust the cache of an announcement that did not change, and vice versa.
+///   2. **Different tier rules.** Every tier brands its site; only MEDIUM and
+///      LARGE get the popup modal. Mixing tier-gated and ungated columns in one
+///      row makes "which parts of this row may this agency write?" a per-column
+///      question spread over twenty columns instead of two tables.
+///   3. **Different blast radius.** `underConstruction` can take a customer's
+///      website offline. That column deserves to live somewhere a careless
+///      `UPDATE agency_branding SET ...` cannot reach.
+///
+/// Optional by design, exactly like `AgencyBranding`: no row means "never
+/// configured", which resolves to a live site with no bar and no popup.
+model AgencySiteConfig {
+  id       String @id @default(uuid())
+  agencyId String @unique @map("agency_id")
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  // ── 1. Under construction ────────────────────────────────────────────────
+  /// When true the public site serves a coming-soon page instead of content.
+  /// The dashboard is deliberately unaffected — this is a *publishing* switch,
+  /// not an account state like `Agency.status = LOCKED`.
+  underConstruction Boolean @default(false) @map("under_construction")
+
+  /// Big line on the coming-soon page. `null` ⇒ the platform default copy.
+  constructionHeadline String? @map("construction_headline")
+
+  /// Paragraph under the headline. `null` ⇒ the platform default copy.
+  constructionMessage String? @map("construction_message")
+
+  // ── 2. Announcement top bar ──────────────────────────────────────────────
+  topBarEnabled Boolean @default(false) @map("top_bar_enabled")
+
+  /// The announcement itself. Plain text — the renderer escapes it. `<` and `>`
+  /// are rejected at the validation layer as belt-and-braces.
+  topBarText String? @map("top_bar_text")
+
+  topBarBehavior TopBarBehavior @default(STATIC) @map("top_bar_behavior")
+
+  /// Bar background as `#RRGGBB`. `null` ⇒ inherit `--brand-primary` from
+  /// `AgencyBranding`, which is what most agencies want and what keeps a bar
+  /// from clashing with the site the moment the brand colour changes. The text
+  /// colour is never stored — it is computed from this so the bar cannot be
+  /// configured into black-on-black.
+  topBarBackgroundColor String? @map("top_bar_background_color")
+
+  /// Optional click-through. Validated to `http`/`https` only.
+  topBarLinkUrl String? @map("top_bar_link_url")
+
+  /// Whether the visitor gets an × . Default true: a bar that cannot be closed
+  /// is a bar that follows someone through a twelve-page booking flow.
+  topBarDismissible Boolean @default(true) @map("top_bar_dismissible")
+
+  // ── 3. Promotional popup modal (MEDIUM and LARGE only) ───────────────────
+  popupEnabled Boolean @default(false) @map("popup_enabled")
+
+  popupTitle String? @map("popup_title")
+  popupBody  String? @map("popup_body")
+
+  /// Button label and destination. Both or neither — enforced in the service.
+  popupCtaLabel String? @map("popup_cta_label")
+  popupCtaUrl   String? @map("popup_cta_url")
+
+  popupTrigger      PopupTrigger   @default(AFTER_DELAY) @map("popup_trigger")
+  popupDelaySeconds Int            @default(5) @map("popup_delay_seconds")
+  popupFrequency    PopupFrequency @default(ONCE_PER_SESSION) @map("popup_frequency")
+
+  // ── 4. "Powered by Funtush" badge ────────────────────────────────────────
+  /// The agency's *preference*. It is not the answer: a FREE-tier agency always
+  /// renders the badge whatever this says (see `resolveFuntushBadge`). Stored
+  /// anyway so that a trial agency which upgrades gets the choice it already
+  /// expressed rather than a silent reset.
+  showFuntushBadge Boolean @default(false) @map("show_funtush_badge")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("agency_site_config")
 }
