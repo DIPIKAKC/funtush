@@ -81,7 +81,6 @@ const THEME = {
   currencySymbol: "Rs",
   currencyDisplay: "SYMBOL",
   currencyExample: "Rs 1,200",
-  poweredByFuntush: true,
   colorPickerMode: "curated",
   updatedAt: new Date("2026-08-07T09:00:00.000Z"),
 };
