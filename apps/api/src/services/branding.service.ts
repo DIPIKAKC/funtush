@@ -61,6 +61,15 @@ export type CurrencyDisplayMode = "SYMBOL" | "CODE" | "SYMBOL_CODE";
  * A fully resolved theme: every field populated, nothing nullable except the two
  * image URLs (an agency genuinely may have no logo, and the renderer falls back
  * to a text wordmark).
+ *
+ * **Moved out on Day 2:** this interface used to carry `poweredByFuntush`,
+ * computed as `tier !== "LARGE"`. Day 2's task states the rule properly — forced
+ * on for the Free trial, hidden on every paid tier — and gives the agency a
+ * stored preference, which makes the badge a *site configuration* value rather
+ * than a theme value. It now lives in one place only, `resolveFuntushBadge` in
+ * `data/siteConfig.ts`, and is served by `GET /site/:slug/config`. Two functions
+ * answering one boolean is how a badge ends up rendering on one page and not the
+ * next.
  */
 export interface ResolvedBranding {
   brandName: string;
@@ -81,12 +90,6 @@ export interface ResolvedBranding {
   currencyDisplay: CurrencyDisplayMode;
   /** A worked example, e.g. `"Rs 1,200"` — so the settings UI can preview it. */
   currencyExample: string;
-  /**
-   * `true` for every tier except LARGE, which buys *complete* white-label
-   * (Backend Guide §6). The renderer must not let this be turned off from the
-   * agency side.
-   */
-  poweredByFuntush: boolean;
   /** `"curated"` or `"free"` — what this agency's tier allows. */
   colorPickerMode: "curated" | "free";
   updatedAt: Date | null;
@@ -356,7 +359,6 @@ export function resolveBranding(
     currencySymbol,
     currencyDisplay,
     currencyExample: formatCurrencyExample(currencySymbol, currencyCode, currencyDisplay),
-    poweredByFuntush: agency.tier !== "LARGE",
     colorPickerMode: allowsFreeColorPicker(agency.tier) ? "free" : "curated",
     updatedAt: row?.updatedAt ?? null,
   };
