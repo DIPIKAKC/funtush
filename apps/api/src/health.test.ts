@@ -70,7 +70,14 @@ beforeAll(async () => {
       resolve();
     });
   });
-});
+  // `./app` pulls in the whole route graph (admin, billing, ad campaigns,
+  // bugs, etc.), so importing it costs far more than the default 10s hook
+  // timeout once vitest is transforming ~60 other test files' dependency
+  // trees at the same time (this file's own work is ~1-2s in isolation —
+  // verified by running it alone repeatedly). 30s gives headroom for that
+  // whole-suite contention without hiding a real hang, which would still
+  // exceed it.
+}, 30000);
 
 afterAll(() => {
   if (server) server.close();
