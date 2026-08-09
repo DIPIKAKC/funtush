@@ -198,6 +198,7 @@ model Agency {
 
   bugReports BugReport[]
   apiKeys ApiKey[]
+  navigation AgencyNavigation?
 
 
   stripeSubscription StripeSubscription?
@@ -1640,4 +1641,92 @@ model AgencySiteConfig {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("agency_site_config")
+}
+
+/// Internal path vs. off-site address for one navigation entry. Which shape
+/// `AgencyNavigationItem.url` must have depends on this column — enforced in
+/// `validations/navigation.validation.ts`, since Postgres has no
+/// "constraint that reads a sibling column" primitive worth hand-writing.
+enum NavigationLinkType {
+  INTERNAL
+  EXTERNAL
+}
+
+/// ── Navigation builder (White-label week · Day 3) ───────────────────────────
+///
+/// One settings row per agency — the Book Now button — plus a genuine list of
+/// menu items in a second table. Same two-tables-not-one call as
+/// `AgencyBranding`/`AgencySiteConfig`, for a third reason of its own: a menu
+/// is a *tree* (up to two levels deep), and a tree cannot be columns on a
+/// single row no matter how the rest of the settings are stored.
+///
+/// Optional by design, exactly like Day 1 and Day 2's tables: no row means
+/// "never configured", which resolves to the platform's standard fixed
+/// navigation — the same nav a Small-tier agency is locked to permanently.
+model AgencyNavigation {
+  id       String @id @default(uuid())
+  agencyId String @unique @map("agency_id")
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  /// `null` ⇒ the platform default label, "Book Now".
+  bookNowLabel String? @map("book_now_label")
+
+  /// Medium and Large only — see `canCustomizeBookNowButton` in
+  /// `data/navigation.ts`. Stored even for a tier that cannot currently toggle
+  /// it, so a downgrade-then-upgrade round trip restores the choice rather
+  /// than resetting it, the same trade-off Day 2 made for the Funtush badge.
+  bookNowHidden Boolean @default(false) @map("book_now_hidden")
+
+  items AgencyNavigationItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("agency_navigation")
+}
+
+/// One entry in a custom menu. A top-level item when `parentId` is `null`, a
+/// dropdown entry when it is set.
+///
+/// `parentId` only ever points at a top-level item — the write path
+/// (`navigation.service.ts`) never creates a grandchild — which is what keeps
+/// "up to two levels deep" true without a recursive depth check anywhere in
+/// the codebase. The column *could* point arbitrarily deep; the guarantee is
+/// enforced by what the one write path is willing to create, the same way a
+/// database with a `DELETE` grant can still never lose data if nothing ever
+/// calls it.
+model AgencyNavigationItem {
+  id           String           @id @default(uuid())
+  navigationId String           @map("navigation_id")
+  navigation   AgencyNavigation @relation(fields: [navigationId], references: [id], onDelete: Cascade)
+
+  parentId String?                @map("parent_id")
+  parent   AgencyNavigationItem?  @relation("NavigationItemChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children AgencyNavigationItem[] @relation("NavigationItemChildren")
+
+  label String
+
+  linkType NavigationLinkType @map("link_type")
+
+  /// An internal path (`/packages`) when `linkType` is `INTERNAL`, or a full
+  /// `http(s)://` URL when it is `EXTERNAL`.
+  url String
+
+  /// Meaningful for `EXTERNAL` links in practice; harmless and simply unread
+  /// by the renderer for `INTERNAL` ones, which is why this is a plain
+  /// non-nullable boolean rather than a three-state "not applicable" column.
+  openInNewTab Boolean @default(false) @map("open_in_new_tab")
+
+  /// Zero-based position among siblings sharing the same `parentId`. This one
+  /// column *is* the drag-and-drop reorder feature: the client sends its whole
+  /// list back in the new order, and the write path renumbers `position` from
+  /// each array's index. There is no separate "reorder" endpoint.
+  position Int
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([navigationId])
+  @@index([parentId])
+  @@map("agency_navigation_items")
 }
