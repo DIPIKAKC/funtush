@@ -17,6 +17,8 @@ import bugRoutes from "./routes/bug.routes";
 import bugAdminRoutes from "./routes/bug.routes.js";
 import apiKeyRoutes from "./routes/apiKey.routes.js";
 import publicApiRoutes from "./routes/publicApi.routes.js";
+import { startVisibilityScoreCron } from "./jobs/visibilityScore.job";
+import { startExpireUnpaidBookingsCron } from "./jobs/expireUnpaidBookings.job";
 
 const app = express();  
 
@@ -62,6 +64,8 @@ app.use("/public-api/v1", publicApiRoutes);
 
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   startSubscriptionCron();
+  startVisibilityScoreCron();
+  startExpireUnpaidBookingsCron();
 }
 
 export default app;

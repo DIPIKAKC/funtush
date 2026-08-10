@@ -31,7 +31,6 @@ enum RoleType {
 
 enum BookingStatus {
   INQUIRY
-  PENDING
   CONFIRMED
   PAYMENT_PENDING
   REJECTED
@@ -269,41 +268,23 @@ model AgencyUser {
   @@unique([agencyId, userId])
   @@map("agency_users")
 }
+model AgencyUser {
+  id           String        @id @default(uuid())
+  agencyId     String        @map("agency_id")
+  userId       String        @map("user_id")
+  role         UserRole      @default(STAFF)
+  joinedAt     DateTime      @default(now()) @map("joined_at")
+  agency       Agency        @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agencyStaffs AgencyStaff[]
 
-model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  role         UserRole
-  roleType     RoleType @map("role_type")
+  customerNotes     CustomerNote[]
+  communicationLogs CommunicationLog[]
+  reviewResponses   ReviewResponse[]
+  journalEntries    JournalEntry[]
 
-  trekker Trekker?
-
-  refreshTokens RefreshToken[]
-
-  /// LEGACY — the original single-token field (one phone per account).
-  ///
-  /// Superseded by the `deviceTokens` relation below (Mobile week · Day 3), which
-  /// supports the real case of a trekker with a phone *and* a tablet. Kept only
-  /// because `notification.service.ts` still reads it; new code must not write it.
-  fcmToken String? @map("fcm_token")
-
-  /// Every device this user has registered for push. See `DeviceToken`.
-  deviceTokens DeviceToken[]
-
-  agencyUsers AgencyUser[]
-
-  assignedBugs BugReport[] @relation("BugAssignee")
-  bugHints     BugHint[]
-
-  failedAttempts Int @default(0)
-
-  isLocked  Boolean   @default(false)
-  lockUntil DateTime?
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-
-  @@map("users")
+  @@unique([agencyId, userId])
+  @@map("agency_users")
 }
 
 /// ── Push token registry (Mobile week · Day 3) ────────────────────────────────
