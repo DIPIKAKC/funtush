@@ -17,6 +17,9 @@ enum AgencyStatus {
 enum UserRole {
   SUPER_ADMIN
   AGENCY_ADMIN
+  PLATFORM_ADMIN
+  PLATFORM_SUPPORT
+  TENANT_ADMIN
   STAFF
 }
 
@@ -125,6 +128,19 @@ enum EmergencyContactType {
   INSURANCE
 }
 
+/// Which app store / runtime a registered device token came from.
+///
+/// Firebase Cloud Messaging needs this because the *same* logical notification
+/// is delivered differently per platform: Android reads the `android.priority`
+/// block, iOS reads the `apns.payload.aps` block, and web push reads neither.
+/// Storing the platform next to the token is what lets the sender build the
+/// right message shape without a second lookup — Backend Guide §13.
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+}
+
 model SubscriptionTier {
   id           String  @id @default(uuid())
   name         String  @unique
@@ -156,6 +172,8 @@ model Agency {
   users             AgencyUser[]
   agencyStaffs      AgencyStaff[]
   profile           AgencyProfile?
+  branding          AgencyBranding?
+  siteConfig        AgencySiteConfig?
   kyc               KycSubmission?
   subscriptions     Subscription[]
   packages          TrekPackage[]
@@ -178,6 +196,11 @@ model Agency {
   accounts       Account[]
   journalEntries JournalEntry[]
   payrolls       Payroll[]
+
+  bugReports BugReport[]
+  apiKeys ApiKey[]
+  navigation AgencyNavigation?
+
 
   stripeSubscription StripeSubscription?
 
@@ -259,8 +282,21 @@ model User {
   trekker Trekker?
 
   refreshTokens RefreshToken[]
-  fcmToken      String?        @map("fcm_token")
-  agencyUsers   AgencyUser[]
+
+  /// LEGACY — the original single-token field (one phone per account).
+  ///
+  /// Superseded by the `deviceTokens` relation below (Mobile week · Day 3), which
+  /// supports the real case of a trekker with a phone *and* a tablet. Kept only
+  /// because `notification.service.ts` still reads it; new code must not write it.
+  fcmToken String? @map("fcm_token")
+
+  /// Every device this user has registered for push. See `DeviceToken`.
+  deviceTokens DeviceToken[]
+
+  agencyUsers AgencyUser[]
+
+  assignedBugs BugReport[] @relation("BugAssignee")
+  bugHints     BugHint[]
 
   failedAttempts Int @default(0)
 
@@ -270,6 +306,54 @@ model User {
   updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+/// ── Push token registry (Mobile week · Day 3) ────────────────────────────────
+///
+/// One row per *device*, not per user. A trekker who owns a phone and a tablet
+/// has two rows; both must ring when an SOS fires, so push delivery reads the
+/// whole set for a user rather than a single column.
+///
+/// Nothing here is agency data, so there is no `tenant_id`: a device belongs to a
+/// platform-level `User`, exactly like the `Trekker` identity in Backend Guide §7.
+/// Isolation is enforced by the fact that every query is keyed on `user_id`.
+model DeviceToken {
+  id String @id @default(uuid())
+
+  /// The account currently signed in on this device.
+  userId String @map("user_id")
+
+  /// The FCM registration token — the address Firebase delivers to.
+  ///
+  /// **Unique**, and that uniqueness is the whole design. Firebase issues one
+  /// token per app installation, so the token *is* the device's identity. If
+  /// Asha logs out of the office iPad and Bina logs in, Firebase hands the app
+  /// the same token; the unique constraint forces that row to be reassigned to
+  /// Bina instead of creating a duplicate that would push Asha's private trek
+  /// details to a phone she no longer holds.
+  fcmToken String @unique @map("fcm_token")
+
+  /// Android / iOS / Web — decides the message shape the sender builds.
+  platform DevicePlatform
+
+  /// Last time the app proved this token is still live, by re-registering it.
+  ///
+  /// FCM silently stops delivering to tokens untouched for ~270 days, so this is
+  /// what lets a cleanup job drop dead rows instead of pushing into the void.
+  lastActiveAt DateTime @default(now()) @map("last_active_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// `Cascade`: deleting the account deletes its devices. A push token that
+  /// outlived its owner is a notification sent to a stranger's phone.
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// "Every token for this user" is the read path of every push send.
+  @@index([userId])
+  /// Supports the stale-token cleanup job's `lastActiveAt < cutoff` scan.
+  @@index([lastActiveAt])
+  @@map("device_tokens")
 }
 
 model Trekker {
@@ -580,7 +664,9 @@ model GuideProfile {
   languages      String[] @default([])
 
   isActive Boolean @default(true) @map("is_active")
+  branchId String? @map("branch_id")
 
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -734,23 +820,23 @@ model AgencyProfile {
 
   facebookPixelId String? @map("facebook_pixel_id")
 
-  instagramConnected Boolean @default(false) @map("instagram_connected")
-  instagramFeedEnabled Boolean @default(false) @map("instagram_feed_enabled")
-  instagramBusinessId String? @map("instagram_business_id")
-  instagramAccessToken String? @map("instagram_access_token") @db.Text
+  instagramConnected      Boolean   @default(false) @map("instagram_connected")
+  instagramFeedEnabled    Boolean   @default(false) @map("instagram_feed_enabled")
+  instagramBusinessId     String?   @map("instagram_business_id")
+  instagramAccessToken    String?   @map("instagram_access_token") @db.Text
   instagramTokenExpiresAt DateTime? @map("instagram_token_expires_at")
   //
 
   //Utility Widgets
   currencyConverterEnabled Boolean @default(false) @map("currency_converter_enabled")
-  
+
   weatherWidgetEnabled Boolean @default(false) @map("weather_enabled")
   //
 
   //YouTube Embeds
-  youtubeEnabled   Boolean @default(false)
-  youtubeVideos    String[] @default([]) 
-  maxYoutubeVideos Int? @default(10)
+  youtubeEnabled   Boolean  @default(false)
+  youtubeVideos    String[] @default([])
+  maxYoutubeVideos Int?     @default(10)
   //
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -1040,10 +1126,10 @@ model AdCampaign {
   clicks      Int     @default(0)
   spend       Decimal @default(0) @db.Decimal(12, 2)
 
-  metaCampaignId   String?
-  googleCampaignId String?
+  metaCampaignId         String?
+  googleCampaignId       String?
   googleSearchCampaignId String?
-  rejectionReason  String?
+  rejectionReason        String?
 
   performanceDaily AdPerformanceDaily[]
 
@@ -1165,6 +1251,7 @@ model Branch {
 
   packageBranches PackageBranch[]
   bookings        Booking[]
+  guides          GuideProfile[]
 
   @@index([agencyId])
   @@index([managerStaffId])
@@ -1341,4 +1428,364 @@ model TransactionFee {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("transaction_fees")
+}
+
+enum BugStatus {
+  REPORTED
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum BugPriority {
+  CRITICAL
+  HIGH
+  NORMAL
+  LOW
+}
+
+model BugReport {
+  id                String       @id @default(cuid())
+  agencyId          String
+  agency            Agency       @relation(fields: [agencyId], references: [id])
+
+  title             String
+  description       String
+  stepsToReproduce  String?
+  screenshotUrl     String?
+
+  status            BugStatus    @default(REPORTED)
+  priority          BugPriority?
+  resolutionNote    String?
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  assignedToId String?
+  assignedTo   User?     @relation("BugAssignee", fields: [assignedToId], references: [id])
+  hints        BugHint[]
+
+  @@index([agencyId])
+  @@index([status])
+}
+
+model BugHint {
+  id          String    @id @default(cuid())
+  bugReportId String
+  bugReport   BugReport @relation(fields: [bugReportId], references: [id])
+  note        String
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([bugReportId])
+}
+
+enum ApiKeyScope {
+  READ_ONLY
+  READ_WRITE
+}
+
+model ApiKey {
+  id          String      @id @default(cuid())
+  agencyId    String
+  agency      Agency      @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  name        String
+  keyHash     String      @unique
+  keyPrefix   String      
+  scope       ApiKeyScope @default(READ_ONLY)
+  lastUsedAt  DateTime?   @map("last_used_at")
+  revoked     Boolean     @default(false)
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  @@index([agencyId])
+  @@map("api_keys")
+}
+
+/// Aspect ratio every package-card thumbnail on the white-label site is cropped
+/// to. One setting per agency, not per package, so a listing page never shows a
+/// ragged mix of shapes. Prisma enum values cannot start with a digit, hence the
+/// `RATIO_` prefix.
+enum CardImageRatio {
+  RATIO_1_1
+  RATIO_4_3
+  RATIO_16_9
+}
+
+/// How a price is written on the white-label site: `Rs 1,200`, `NPR 1,200`, or
+/// `Rs 1,200 NPR`. Agencies selling to foreign trekkers usually want the code
+/// (unambiguous); agencies selling locally want the symbol (shorter).
+enum CurrencyDisplay {
+  SYMBOL
+  CODE
+  SYMBOL_CODE
+}
+
+/// ── Brand identity for one agency's white-label site (White-label week · Day 1)
+///
+/// Deliberately a table of its own rather than more columns on `AgencyProfile`,
+/// for three reasons:
+///
+///   1. **Different reader.** `AgencyProfile` is read by the dashboard when a
+///      staff member opens a settings page. This row is read by the *public*
+///      site renderer on every page view, by anonymous visitors. Keeping it
+///      separate means that hot, cacheable read never drags a profile full of
+///      widget access tokens (`instagramAccessToken`, `liveChatCode`) into
+///      memory — the safest way to not leak a secret is to not load it.
+///   2. **Different lifecycle.** Branding is edited by one person once and then
+///      basically never; widget settings churn. Separate rows mean separate
+///      `updatedAt`, which is what lets the renderer cache by timestamp.
+///   3. **Optional by design.** A brand-new agency has no branding row at all
+///      and the site still renders, from `DEFAULT_BRANDING`. A nullable row is
+///      an honest way to say "never configured", which a table of nullable
+///      columns bolted onto an existing row cannot say.
+model AgencyBranding {
+  id       String @id @default(uuid())
+  agencyId String @unique @map("agency_id")
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  /// Trading name shown in the site header and the browser tab. Falls back to
+  /// `Agency.name` (the legal/registered name) when unset — the two differ more
+  /// often than you would think ("Himalayan Trails Pvt. Ltd." vs "Himalayan
+  /// Trails").
+  brandName String? @map("brand_name")
+
+  /// CDN URL of the header logo. Accepted at exactly 725×145 px — see
+  /// `LOGO_SPEC` in `apps/api/src/data/brandTheme.ts` for why the size is fixed.
+  logoUrl String? @map("logo_url")
+
+  /// CDN URL of the browser-tab icon, accepted at exactly 96×96 px.
+  faviconUrl String? @map("favicon_url")
+
+  /// Primary brand colour as an uppercase 6-digit hex string, e.g. `#0F766E`.
+  primaryColor String? @map("primary_color")
+
+  /// Which curated swatch `primaryColor` came from, or `null` when the agency
+  /// picked a free-form colour. Stored so the settings UI can re-select the
+  /// right swatch, and so a downgrade to SMALL can tell "this is one of ours"
+  /// from "this needs re-picking".
+  paletteId String? @map("palette_id")
+
+  /// Font family key from the `BRAND_FONTS` whitelist (not a raw CSS value —
+  /// see the service for why a free-text font is an injection hole).
+  fontFamily String? @map("font_family")
+
+  cardImageRatio CardImageRatio @default(RATIO_4_3) @map("card_image_ratio")
+
+  /// ISO 4217 code, e.g. `NPR`. Drives the default symbol.
+  currencyCode String @default("NPR") @map("currency_code")
+
+  /// Overrides the symbol from the currency table when an agency insists on a
+  /// different glyph (`रु` instead of `Rs`). `null` ⇒ use the table's symbol.
+  currencySymbol String? @map("currency_symbol")
+
+  currencyDisplay CurrencyDisplay @default(SYMBOL) @map("currency_display")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("agency_branding")
+}
+
+/// Whether the announcement bar sits still or marquees across the page.
+/// `SCROLLING` exists because a 160-character notice does not fit a phone
+/// screen; it is a rendering hint, not a second kind of bar.
+enum TopBarBehavior {
+  STATIC
+  SCROLLING
+}
+
+/// When the promotional modal opens. `AFTER_DELAY` reads `popupDelaySeconds`;
+/// the other two ignore it. `ON_EXIT_INTENT` fires when the pointer leaves
+/// toward the browser chrome — desktop only, so a renderer must fall back to
+/// `AFTER_DELAY` on touch devices.
+enum PopupTrigger {
+  ON_LOAD
+  AFTER_DELAY
+  ON_EXIT_INTENT
+}
+
+/// How often one visitor sees the modal. The *enforcement* is client-side
+/// (sessionStorage / localStorage / a cookie) because the site has no visitor
+/// identity to key on — this column only tells the renderer which bucket to use.
+enum PopupFrequency {
+  EVERY_VISIT
+  ONCE_PER_SESSION
+  ONCE_PER_DAY
+  ONCE_EVER
+}
+
+/// ── Site configuration for one agency's white-label site (White-label week · Day 2)
+///
+/// A second table beside `AgencyBranding` rather than more columns on it, and the
+/// reason is *not* the Day 1 reason (different reader — here the reader is the
+/// same public renderer). It is:
+///
+///   1. **Different question.** Branding answers "what does this site look
+///      like?" and is set once. This answers "what is this site doing right
+///      now?" — is it up, what is it announcing, what is it promoting — and
+///      changes weekly. Two `updatedAt` columns mean a colour change does not
+///      bust the cache of an announcement that did not change, and vice versa.
+///   2. **Different tier rules.** Every tier brands its site; only MEDIUM and
+///      LARGE get the popup modal. Mixing tier-gated and ungated columns in one
+///      row makes "which parts of this row may this agency write?" a per-column
+///      question spread over twenty columns instead of two tables.
+///   3. **Different blast radius.** `underConstruction` can take a customer's
+///      website offline. That column deserves to live somewhere a careless
+///      `UPDATE agency_branding SET ...` cannot reach.
+///
+/// Optional by design, exactly like `AgencyBranding`: no row means "never
+/// configured", which resolves to a live site with no bar and no popup.
+model AgencySiteConfig {
+  id       String @id @default(uuid())
+  agencyId String @unique @map("agency_id")
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  // ── 1. Under construction ────────────────────────────────────────────────
+  /// When true the public site serves a coming-soon page instead of content.
+  /// The dashboard is deliberately unaffected — this is a *publishing* switch,
+  /// not an account state like `Agency.status = LOCKED`.
+  underConstruction Boolean @default(false) @map("under_construction")
+
+  /// Big line on the coming-soon page. `null` ⇒ the platform default copy.
+  constructionHeadline String? @map("construction_headline")
+
+  /// Paragraph under the headline. `null` ⇒ the platform default copy.
+  constructionMessage String? @map("construction_message")
+
+  // ── 2. Announcement top bar ──────────────────────────────────────────────
+  topBarEnabled Boolean @default(false) @map("top_bar_enabled")
+
+  /// The announcement itself. Plain text — the renderer escapes it. `<` and `>`
+  /// are rejected at the validation layer as belt-and-braces.
+  topBarText String? @map("top_bar_text")
+
+  topBarBehavior TopBarBehavior @default(STATIC) @map("top_bar_behavior")
+
+  /// Bar background as `#RRGGBB`. `null` ⇒ inherit `--brand-primary` from
+  /// `AgencyBranding`, which is what most agencies want and what keeps a bar
+  /// from clashing with the site the moment the brand colour changes. The text
+  /// colour is never stored — it is computed from this so the bar cannot be
+  /// configured into black-on-black.
+  topBarBackgroundColor String? @map("top_bar_background_color")
+
+  /// Optional click-through. Validated to `http`/`https` only.
+  topBarLinkUrl String? @map("top_bar_link_url")
+
+  /// Whether the visitor gets an × . Default true: a bar that cannot be closed
+  /// is a bar that follows someone through a twelve-page booking flow.
+  topBarDismissible Boolean @default(true) @map("top_bar_dismissible")
+
+  // ── 3. Promotional popup modal (MEDIUM and LARGE only) ───────────────────
+  popupEnabled Boolean @default(false) @map("popup_enabled")
+
+  popupTitle String? @map("popup_title")
+  popupBody  String? @map("popup_body")
+
+  /// Button label and destination. Both or neither — enforced in the service.
+  popupCtaLabel String? @map("popup_cta_label")
+  popupCtaUrl   String? @map("popup_cta_url")
+
+  popupTrigger      PopupTrigger   @default(AFTER_DELAY) @map("popup_trigger")
+  popupDelaySeconds Int            @default(5) @map("popup_delay_seconds")
+  popupFrequency    PopupFrequency @default(ONCE_PER_SESSION) @map("popup_frequency")
+
+  // ── 4. "Powered by Funtush" badge ────────────────────────────────────────
+  /// The agency's *preference*. It is not the answer: a FREE-tier agency always
+  /// renders the badge whatever this says (see `resolveFuntushBadge`). Stored
+  /// anyway so that a trial agency which upgrades gets the choice it already
+  /// expressed rather than a silent reset.
+  showFuntushBadge Boolean @default(false) @map("show_funtush_badge")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("agency_site_config")
+}
+
+/// Internal path vs. off-site address for one navigation entry. Which shape
+/// `AgencyNavigationItem.url` must have depends on this column — enforced in
+/// `validations/navigation.validation.ts`, since Postgres has no
+/// "constraint that reads a sibling column" primitive worth hand-writing.
+enum NavigationLinkType {
+  INTERNAL
+  EXTERNAL
+}
+
+/// ── Navigation builder (White-label week · Day 3) ───────────────────────────
+///
+/// One settings row per agency — the Book Now button — plus a genuine list of
+/// menu items in a second table. Same two-tables-not-one call as
+/// `AgencyBranding`/`AgencySiteConfig`, for a third reason of its own: a menu
+/// is a *tree* (up to two levels deep), and a tree cannot be columns on a
+/// single row no matter how the rest of the settings are stored.
+///
+/// Optional by design, exactly like Day 1 and Day 2's tables: no row means
+/// "never configured", which resolves to the platform's standard fixed
+/// navigation — the same nav a Small-tier agency is locked to permanently.
+model AgencyNavigation {
+  id       String @id @default(uuid())
+  agencyId String @unique @map("agency_id")
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  /// `null` ⇒ the platform default label, "Book Now".
+  bookNowLabel String? @map("book_now_label")
+
+  /// Medium and Large only — see `canCustomizeBookNowButton` in
+  /// `data/navigation.ts`. Stored even for a tier that cannot currently toggle
+  /// it, so a downgrade-then-upgrade round trip restores the choice rather
+  /// than resetting it, the same trade-off Day 2 made for the Funtush badge.
+  bookNowHidden Boolean @default(false) @map("book_now_hidden")
+
+  items AgencyNavigationItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("agency_navigation")
+}
+
+/// One entry in a custom menu. A top-level item when `parentId` is `null`, a
+/// dropdown entry when it is set.
+///
+/// `parentId` only ever points at a top-level item — the write path
+/// (`navigation.service.ts`) never creates a grandchild — which is what keeps
+/// "up to two levels deep" true without a recursive depth check anywhere in
+/// the codebase. The column *could* point arbitrarily deep; the guarantee is
+/// enforced by what the one write path is willing to create, the same way a
+/// database with a `DELETE` grant can still never lose data if nothing ever
+/// calls it.
+model AgencyNavigationItem {
+  id           String           @id @default(uuid())
+  navigationId String           @map("navigation_id")
+  navigation   AgencyNavigation @relation(fields: [navigationId], references: [id], onDelete: Cascade)
+
+  parentId String?                @map("parent_id")
+  parent   AgencyNavigationItem?  @relation("NavigationItemChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children AgencyNavigationItem[] @relation("NavigationItemChildren")
+
+  label String
+
+  linkType NavigationLinkType @map("link_type")
+
+  /// An internal path (`/packages`) when `linkType` is `INTERNAL`, or a full
+  /// `http(s)://` URL when it is `EXTERNAL`.
+  url String
+
+  /// Meaningful for `EXTERNAL` links in practice; harmless and simply unread
+  /// by the renderer for `INTERNAL` ones, which is why this is a plain
+  /// non-nullable boolean rather than a three-state "not applicable" column.
+  openInNewTab Boolean @default(false) @map("open_in_new_tab")
+
+  /// Zero-based position among siblings sharing the same `parentId`. This one
+  /// column *is* the drag-and-drop reorder feature: the client sends its whole
+  /// list back in the new order, and the write path renumbers `position` from
+  /// each array's index. There is no separate "reorder" endpoint.
+  position Int
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([navigationId])
+  @@index([parentId])
+  @@map("agency_navigation_items")
 }

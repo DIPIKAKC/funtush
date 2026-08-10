@@ -8,6 +8,14 @@ import {
   offlinePackageController,
   offlinePackageVersionController,
 } from "../controllers/offlinePackage.controller";
+import {
+  registerDeviceController,
+  unregisterDeviceController,
+} from "../controllers/deviceToken.controller";
+import {
+  emergencyNumbersController,
+  emergencyNumbersVersionController,
+} from "../controllers/emergencyNumbers.controller";
 
 /**
  * ── Mobile API routes (Mobile week · Day 1) ──────────────────────────────────
@@ -98,5 +106,64 @@ router.get(
   requireRole(OFFLINE_PACKAGE_ROLES),
   offlinePackageController
 );
+
+/* ── Push token & device management (Mobile week · Day 3) ─────────────────── */
+
+/**
+ * These two routes carry `requireAuth` but **no** `requireRole`, and that is a
+ * deliberate difference from every route above.
+ *
+ * `requireRole` exists to answer "is this kind of user allowed to see this kind
+ * of data?". Here there is no such question: the only row a caller can create,
+ * refresh or delete is one keyed to their own `userId`, taken from their own
+ * verified token. A trekker, a guide, an agency admin and a platform admin all
+ * have the same, equally legitimate need — the app on their phone must be able
+ * to receive notifications. Adding a role list would only mean that the next
+ * role someone invents silently stops getting push, which for SOS alerts
+ * (Backend Guide §10) is the exact failure mode we cannot afford.
+ */
+router.post("/register-device", requireAuth, registerDeviceController);
+
+/**
+ * `DELETE` rather than `POST /unregister-device`: the same resource identifier
+ * ("this device's registration") with the verb that says what happens to it.
+ * The token itself travels in the body or query, not the path, because a path
+ * segment ends up in access logs and proxy logs — and a token in a log file is a
+ * token anyone with log access can push to.
+ */
+router.delete("/register-device", requireAuth, unregisterDeviceController);
+
+/* ── Local emergency number bundle (Mobile week · Day 4) ──────────────────── */
+
+/**
+ * These two routes also carry `requireAuth` but **no** `requireRole`, for the
+ * same reason as the device routes above: there is no per-role dimension to the
+ * question "what number do you dial in Nepal?". Every signed-in person's app
+ * needs the same table, and a role list here would mean the next role someone
+ * adds ships with an empty emergency screen.
+ *
+ * Why keep `requireAuth` at all, when the data is public information?
+ * ──────────────────────────────────────────────────────────────────
+ * Because nothing is lost by it. SOS layer 1 (Backend Guide §10) dials from the
+ * copy already **bundled in the app binary**, so a user who is signed out — or
+ * has no signal at all — is unaffected: they always have numbers to dial. This
+ * endpoint only *refreshes* that copy, and refreshing is something a signed-in
+ * app does in the background on a good connection.
+ *
+ * What we gain is that an unauthenticated endpoint returning a ~15 KB body is a
+ * free bandwidth amplifier for anyone who wants to point a script at it. Behind
+ * a token, with a 24-hour cache and a 120-byte version probe in front of it,
+ * that is a non-issue.
+ */
+
+/**
+ * Registered before the route below it — the same "most specific path first"
+ * habit as the offline-package pair. Express matches in declaration order, so
+ * keeping the literal `/version` segment ahead of anything that could grow a
+ * wildcard is what stops the next person from being surprised.
+ */
+router.get("/emergency-numbers/version", requireAuth, emergencyNumbersVersionController);
+
+router.get("/emergency-numbers", requireAuth, emergencyNumbersController);
 
 export default router;

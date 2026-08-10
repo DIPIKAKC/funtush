@@ -2,12 +2,21 @@ import { Request, Response } from "express";
 import { convertCurrencyService, updateCurrencyConverterWidgetService } from "src/services/widgets/currencyConverter.service";
 
 
-export const updateCurrencyConverterWidgetController = async (
+export const currencyConverterWidgetController = async (
     req: Request,
     res: Response
 ) => {
     try {
         const agencyUserId = req.tenantId as string;
+
+        const { enabled } = req.body;
+
+        if (typeof enabled !== "boolean") {
+            return res.status(400).json({
+                success: false,
+                message: "enabled is required and must be a boolean.",
+            });
+        }
 
         const widget = await updateCurrencyConverterWidgetService(
             agencyUserId,
@@ -16,7 +25,7 @@ export const updateCurrencyConverterWidgetController = async (
 
         return res.status(200).json({
             success: true,
-            message:  widget.currencyConverterEnabled
+            message: widget.currencyConverterEnabled
                 ? "Currency Converter enabled successfully."
                 : "Currency Converter disabled successfully.",
             data: widget,
