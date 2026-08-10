@@ -176,7 +176,7 @@ describe(' Public API Surface (Read-Only v1)', () => {
                 departureDateId: agency1Departure2,
                 groupSize: 2,
                 totalPrice: 3600,
-                status: 'PENDING',
+                status: 'INQUIRY',
                 trekkerName: 'Jane Smith',
                 trekkerEmail: 'jane@example.com',
                 trekkerPhone: '+9779800000002',
@@ -311,11 +311,11 @@ describe(' Public API Surface (Read-Only v1)', () => {
 
         it('filters by status when provided', async () => {
             const confirmed = await listPublicBookings(agency1Id, 1, 20, 'CONFIRMED');
-            const pending = await listPublicBookings(agency1Id, 1, 20, 'PENDING');
+            const inquiry = await listPublicBookings(agency1Id, 1, 20, 'INQUIRY');
             const rejected = await listPublicBookings(agency1Id, 1, 20, 'REJECTED');
 
             expect(confirmed.items.some((b) => b.id === agency1Booking1Id)).toBe(true);
-            expect(pending.items.some((b) => b.id === agency1Booking2Id)).toBe(true);
+            expect(inquiry.items.some((b) => b.id === agency1Booking2Id)).toBe(true);
             expect(rejected.items).toEqual([]);
         });
 
