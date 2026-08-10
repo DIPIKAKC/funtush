@@ -302,7 +302,7 @@ model User {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
-  @@map("agency_users")
+  @@map("users")
 }
 
 /// ── Push token registry (Mobile week · Day 3) ────────────────────────────────
