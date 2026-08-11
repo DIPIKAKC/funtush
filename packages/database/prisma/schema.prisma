@@ -210,6 +210,7 @@ model Agency {
 
   fonepayQRCode       FonepayQRCode?
   fonepayTransactions FonepayTransaction[]
+  categories          Category[]
 
   @@map("agencies")
 }
@@ -659,11 +660,11 @@ model GuideProfile {
   satellitePhone String?  @map("satellite_phone")
   /// Languages the guide speaks, e.g. ["en", "ne", "de"].
   languages      String[] @default([])
-
   isActive Boolean @default(true) @map("is_active")
-  branchId String? @map("branch_id")
 
-  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  branchId String? @map("branch_id")
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -672,6 +673,7 @@ model GuideProfile {
   /// One profile per guide per agency — the pair the service looks up by.
   @@unique([agencyId, guideRef])
   @@index([agencyId])
+  @@index([branchId])
   @@map("guide_profiles")
 }
 
@@ -1729,4 +1731,20 @@ model AgencyNavigationItem {
   @@index([navigationId])
   @@index([parentId])
   @@map("agency_navigation_items")
+}
+//Category
+model Category {
+  id          String  @id @default(uuid())
+  agencyId    String  @map("agency_id")
+  name        String
+  description String?
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([agencyId, name])
+  @@index([agencyId])
+  @@map("categories")
 }
