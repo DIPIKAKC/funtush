@@ -6,6 +6,12 @@ import {
   acceptBooking,
   rejectBooking,
   proposeAlternativeDate,
+  confirmBooking,
+  cancelBooking,
+  getBookingById,
+  assignGuide,
+  checkInBooking,
+  checkOutBooking,
 } from "../services/booking.service";
 
 export const submitInquiryController = async (req: Request, res: Response) => {
@@ -88,6 +94,80 @@ export const proposeDateController = async (req: Request, res: Response) => {
     const message = err instanceof Error ? err.message : "Failed to propose date";
     const status = message.includes("Unauthorized") ? 403
       : message.includes("not found") ? 404 : 400;
+    return res.status(status).json({ success: false, message });
+  }
+};
+
+export const confirmBookingController = async (req: Request, res: Response) => {
+  try {
+    const id = typeof req.params.id === "string" ? req.params.id : req.params.id[0];
+    const result = await confirmBooking(id, req.user!.agencyId!);
+    return res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to confirm booking";
+    const status = message.includes("Unauthorized") ? 403 : message.includes("not found") ? 404 : 400;
+    return res.status(status).json({ success: false, message });
+  }
+};
+
+export const cancelBookingController = async (req: Request, res: Response) => {
+  try {
+    const id = typeof req.params.id === "string" ? req.params.id : req.params.id[0];
+    const { reason } = req.body;
+    const result = await cancelBooking(id, req.user!.agencyId!, reason);
+    return res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to cancel booking";
+    const status = message.includes("Unauthorized") ? 403 : message.includes("not found") ? 404 : 400;
+    return res.status(status).json({ success: false, message });
+  }
+};
+
+export const getBookingByIdController = async (req: Request, res: Response) => {
+  try {
+    const id = typeof req.params.id === "string" ? req.params.id : req.params.id[0];
+    const result = await getBookingById(id, req.user!.agencyId!);
+    return res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to fetch booking";
+    const status = message.includes("not found") ? 404 : 400;
+    return res.status(status).json({ success: false, message });
+  }
+};
+
+export const assignGuideController = async (req: Request, res: Response) => {
+  try {
+    const id = typeof req.params.id === "string" ? req.params.id : req.params.id[0];
+    const { guideRef } = req.body;
+    const result = await assignGuide(id, req.user!.agencyId!, guideRef);
+    return res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to assign guide";
+    const status = message.includes("Unauthorized") ? 403 : message.includes("not found") ? 404 : 400;
+    return res.status(status).json({ success: false, message });
+  }
+};
+
+export const checkInBookingController = async (req: Request, res: Response) => {
+  try {
+    const id = typeof req.params.id === "string" ? req.params.id : req.params.id[0];
+    const result = await checkInBooking(id, req.user!.agencyId!);
+    return res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to check in booking";
+    const status = message.includes("Unauthorized") ? 403 : message.includes("not found") ? 404 : 400;
+    return res.status(status).json({ success: false, message });
+  }
+};
+
+export const checkOutBookingController = async (req: Request, res: Response) => {
+  try {
+    const id = typeof req.params.id === "string" ? req.params.id : req.params.id[0];
+    const result = await checkOutBooking(id, req.user!.agencyId!);
+    return res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to check out booking";
+    const status = message.includes("Unauthorized") ? 403 : message.includes("not found") ? 404 : 400;
     return res.status(status).json({ success: false, message });
   }
 };

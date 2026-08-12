@@ -19,6 +19,7 @@ import siteConfigRoutes from "./routes/siteConfig.routes.js";
 import navigationRoutes from "./routes/navigation.routes.js";
 import widgetsRoutes from "./routes/widgets/widgets.routes.js";
 import instagramRoutes from "./routes/widgets/instagram.routes.js";
+import blogRoutes from "./routes/blog.routes.js";
 import financeRoutes from "./routes/finance.route.js";
 import staffRoutes from "./routes/staff.routes";
 import adminRoutes from "./routes/admin/index.js";
@@ -60,6 +61,7 @@ app.use("/", siteConfigRoutes);
 app.use("/", navigationRoutes);
 app.use("/agencies/me/widgets", widgetsRoutes);
 app.use("/", instagramRoutes);
+app.use("/", blogRoutes);
 
 
 app.use("/", trekkerRoutes);

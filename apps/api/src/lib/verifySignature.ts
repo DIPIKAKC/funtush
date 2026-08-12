@@ -16,13 +16,21 @@ export function verifyStripeSignature(
   signature: string,
   secret: string
 ): boolean {
-  const hmac = crypto
-    .createHmac("sha256", secret)
-    .update(rawBody)
-    .digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(signature));
-}
+  const parts = Object.fromEntries(
+    signature.split(",").map((p) => p.split("="))
+  ) as { t?: string; v1?: string };
 
+  if (!parts.t || !parts.v1) return false;
+
+  // Reject stale webhooks (>5 min old) to prevent replay
+  const age = Math.abs(Date.now() / 1000 - Number(parts.t));
+  if (age > 300) return false;
+
+  const signedPayload = `${parts.t}.${rawBody.toString()}`;
+  const expected = crypto.createHmac("sha256", secret).update(signedPayload).digest("hex");
+
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(parts.v1));
+}
 
 // Khalti
 export async function verifyKhaltiPayment(
