@@ -288,6 +288,12 @@ describe("GET /site/:slug/navigation", () => {
     expect(maxAge).toBeLessThanOrEqual(15);
   });
 
+  it("labels the response so Day 4's purge can find it", async () => {
+    const res = await fetch(`${baseUrl}/site/himalayan-trails/navigation`);
+
+    expect(res.headers.get("cache-tag")).toBe("nav:himalayan-trails");
+  });
+
   it("answers 304 to a matching If-None-Match", async () => {
     const first = await fetch(`${baseUrl}/site/himalayan-trails/navigation`);
     const etag = first.headers.get("etag")!;

@@ -26,6 +26,7 @@ import {
   updateSiteConfig,
 } from "../services/siteConfig.service";
 import type { SiteConfigUpdateInput } from "../validations/siteConfig.validation";
+import { cacheTagHeaderValue } from "../data/staticPages";
 
 /** Dashboard reads: always fresh. */
 const PRIVATE_NO_STORE = "private, no-store";
@@ -107,13 +108,17 @@ export async function patchMySiteConfig(req: Request, res: Response): Promise<vo
     // parsed, trimmed result, so this cast describes reality rather than hoping.
     const input = req.body as SiteConfigUpdateInput;
 
-    const config = await updateSiteConfig(agencyId, input);
+    // Day 4: the regeneration receipt is lifted out of `data` for the reason
+    // given in `branding.controller.ts` — saved settings and background-job
+    // telemetry are two different payloads.
+    const { regeneration, ...config } = await updateSiteConfig(agencyId, input);
 
     res.setHeader("Cache-Control", PRIVATE_NO_STORE);
     res.status(200).json({
       success: true,
       message: "Site configuration updated",
       data: config,
+      regeneration,
     });
   } catch (err) {
     respondWithError(res, err, "PATCH /agencies/me/site-config");
@@ -153,6 +158,8 @@ export async function getSiteConfigBySlug(req: Request, res: Response): Promise<
 
     res.setHeader("Cache-Control", PUBLIC_SITE_CACHE);
     res.setHeader("ETag", etag);
+    // Day 4: the purge label for this body. See `branding.controller.ts`.
+    res.setHeader("Cache-Tag", cacheTagHeaderValue(slug, ["siteConfig"]));
 
     if (req.headers["if-none-match"] === etag) {
       res.status(304).end();

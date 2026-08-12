@@ -55,6 +55,7 @@ import {
   resolveBranding,
   type BrandingRow,
 } from "./branding.service";
+import { queueRegeneration, type RegenerationReceipt } from "./regeneration.service";
 
 /* ── Types ───────────────────────────────────────────────────────────────── */
 
@@ -613,15 +614,22 @@ export async function getPublicSiteConfigBySlug(
  *   4. Coherence, against the merged state.
  *   5. One `upsert`, because an agency that has never opened this screen has no
  *      row.
+ *   6. **Day 4:** queue the static-site regeneration, after the commit.
  *
- * There are no file uploads and no external calls here, so unlike Day 1's
- * branding write there is nothing to clean up afterwards — the whole operation
- * is a single statement that either happens or does not.
+ * There are no file uploads here, so unlike Day 1's branding write there is
+ * nothing to clean up afterwards — the database part of the operation is a
+ * single statement that either happens or does not.
+ *
+ * This screen is the one where a stale cache is most visible, and it is worth
+ * knowing why: `underConstruction` is a switch between two completely different
+ * websites. An agency flipping it off is *launching*, and a coming-soon page
+ * that lingers at the edge for another cache lifetime is a launch that appears
+ * not to have happened. Same hook as Day 1's, higher stakes.
  */
 export async function updateSiteConfig(
   agencyId: string,
   input: SiteConfigUpdateInput,
-): Promise<EditableSiteConfig> {
+): Promise<EditableSiteConfig & { regeneration: RegenerationReceipt }> {
   const agency = await getAgencyBrandContext(agencyId);
   const existing = (await db.agencySiteConfig.findUnique({
     where: { agencyId },
@@ -663,7 +671,18 @@ export async function updateSiteConfig(
   // Re-read through `getSiteConfig` so the response is produced by exactly the
   // same code path as a plain GET. Two builders for one response shape is how a
   // save comes back subtly different from the reload that follows it.
-  return getSiteConfig(agencyId);
+  const config = await getSiteConfig(agencyId);
+
+  // ── Step 6: publish.
+  const regeneration = queueRegeneration({
+    agencyId,
+    slug: agency.slug,
+    customDomain: agency.customDomain,
+    scopes: ["siteConfig"],
+    version: config.updatedAt,
+  });
+
+  return { ...config, regeneration };
 }
 
 /* ── 7. The guard for public site content ────────────────────────────────── */

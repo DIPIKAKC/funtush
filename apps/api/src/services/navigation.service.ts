@@ -35,6 +35,7 @@ import {
 } from "../data/navigation";
 import type { NavigationUpdateInput } from "../validations/navigation.validation";
 import { getAgencyBrandContext } from "./branding.service";
+import { queueRegeneration, type RegenerationReceipt } from "./regeneration.service";
 
 /* ── Types ───────────────────────────────────────────────────────────────── */
 
@@ -386,6 +387,11 @@ export async function getPublicNavigationBySlug(
  *   3. One transaction: upsert the settings row (Book Now fields), and — only
  *      if the request sent `items` — delete every stored item and recreate
  *      the new list from scratch.
+ *   4. **Day 4:** queue the static-site regeneration, *after* the transaction
+ *      commits. Inside it would be a genuine bug rather than a style choice: a
+ *      transaction that rolls back after the purge has already fired leaves the
+ *      renderer rebuilding pages from a menu that no longer exists, and the
+ *      edge caching that phantom for a full cache lifetime.
  *
  * **Why delete-then-recreate instead of diffing against stored rows by id?**
  * Because the request does not carry ids. The client's whole job on this
@@ -405,7 +411,7 @@ export async function getPublicNavigationBySlug(
 export async function updateNavigation(
   agencyId: string,
   input: NavigationUpdateInput,
-): Promise<EditableNavigation> {
+): Promise<EditableNavigation & { regeneration: RegenerationReceipt }> {
   const agency = await getAgencyBrandContext(agencyId);
 
   if (Object.keys(input).length === 0) {
@@ -463,5 +469,16 @@ export async function updateNavigation(
     }
   });
 
-  return getNavigation(agencyId);
+  const navigation = await getNavigation(agencyId);
+
+  // ── Step 4: publish.
+  const regeneration = queueRegeneration({
+    agencyId,
+    slug: agency.slug,
+    customDomain: agency.customDomain,
+    scopes: ["navigation"],
+    version: navigation.updatedAt,
+  });
+
+  return { ...navigation, regeneration };
 }

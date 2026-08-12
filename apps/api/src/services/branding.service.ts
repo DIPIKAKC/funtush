@@ -45,6 +45,10 @@ import {
   type ImageSpec,
 } from "../data/brandTheme";
 import type { BrandingUpdateInput } from "../validations/branding.validation";
+import {
+  queueRegeneration,
+  type RegenerationReceipt,
+} from "./regeneration.service";
 
 /* ── Types ───────────────────────────────────────────────────────────────── */
 
@@ -111,6 +115,10 @@ export async function getAgencyBrandContext(agencyId: string) {
       name: true,
       slug: true,
       status: true,
+      // Day 4: a mapped domain is a second live cache in front of the same site,
+      // so every regeneration has to know about it. Selected here rather than in
+      // a second query because every write path already calls this function.
+      customDomain: true,
       tier: { select: { name: true } },
     },
   });
@@ -122,6 +130,7 @@ export async function getAgencyBrandContext(agencyId: string) {
     name: agency.name,
     slug: agency.slug,
     status: agency.status,
+    customDomain: agency.customDomain ?? null,
     // A tier row is required by the schema, but defaulting keeps a corrupt
     // fixture from crashing the branding screen — the strictest tier wins.
     tier: agency.tier?.name ?? "FREE",
@@ -483,16 +492,24 @@ export async function getBrandingOptions(agencyId: string) {
  *   4. Upload both files in parallel.
  *   5. `upsert` the row.
  *   6. Best-effort delete of the files that were just replaced.
+ *   7. **Day 4:** queue the static-site regeneration.
  *
  * Note step 6 happens *after* the database commit. If it ran before, a failed
  * upsert would leave a row pointing at a file we had already deleted — a live
  * site with a broken logo, which is far worse than an orphaned object.
+ *
+ * Step 7 is after the commit for a sharper version of the same reason: every
+ * throw above it — the tier 403, the image 400s, a failed upload — leaves this
+ * line unreached, so **a rejected save never purges a cache**. A purge on a
+ * rejected save is not merely wasted; it forces a rebuild of pages that did not
+ * change, and on a busy platform that is a self-inflicted origin stampede
+ * triggered by invalid input, which is the shape of a denial-of-service bug.
  */
 export async function updateAgencyBranding(
   agencyId: string,
   input: BrandingUpdateInput,
   files: BrandImageFiles = {},
-): Promise<ResolvedBranding> {
+): Promise<ResolvedBranding & { regeneration: RegenerationReceipt }> {
   const agency = await getAgencyBrandContext(agencyId);
   const existing = await db.agencyBranding.findUnique({ where: { agencyId } });
 
@@ -559,5 +576,18 @@ export async function updateAgencyBranding(
   if (logoUrl) await discardReplacedFile(existing?.logoUrl);
   if (faviconUrl) await discardReplacedFile(existing?.faviconUrl);
 
-  return resolveBranding(agency, saved as BrandingRow);
+  // ── Step 7: publish. Returns immediately; the pipeline runs in the
+  // background and updates this receipt object in place.
+  const regeneration = queueRegeneration({
+    agencyId,
+    slug: agency.slug,
+    customDomain: agency.customDomain,
+    scopes: ["branding"],
+    // The saved row's own timestamp, so the version the renderer is told to
+    // publish is the version the database actually holds — not "now", which is
+    // a slightly later moment and drifts under load.
+    version: saved.updatedAt,
+  });
+
+  return { ...resolveBranding(agency, saved as BrandingRow), regeneration };
 }

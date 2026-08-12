@@ -28,6 +28,7 @@ import {
   type BrandImageFiles,
 } from "../services/branding.service";
 import type { BrandingUpdateInput } from "../validations/branding.validation";
+import { cacheTagHeaderValue } from "../data/staticPages";
 
 /** Dashboard reads: always fresh. */
 const PRIVATE_NO_STORE = "private, no-store";
@@ -120,7 +121,12 @@ export async function patchMyBranding(req: Request, res: Response): Promise<void
     const input = req.body as BrandingUpdateInput;
     const files = (req.files ?? {}) as BrandImageFiles;
 
-    const branding = await updateAgencyBranding(agencyId, input, files);
+    // Day 4: the service returns the theme *and* a receipt for the static-site
+    // regeneration it just queued. They are separated here rather than nested in
+    // `data`, because `data` is the agency's saved settings and the receipt is
+    // an operational record of a background job — mixing the two would put a
+    // field in the settings payload that a settings form must learn to ignore.
+    const { regeneration, ...branding } = await updateAgencyBranding(agencyId, input, files);
 
     res.setHeader("Cache-Control", PRIVATE_NO_STORE);
     res.status(200).json({
@@ -130,6 +136,10 @@ export async function patchMyBranding(req: Request, res: Response): Promise<void
       // The variables the site will now render with, echoed back so the
       // settings screen can live-preview without a second request.
       cssVariables: brandingCssVariables(branding),
+      // What is being republished, and how far it has got. This is what turns
+      // "did my change go live?" from a support question into a value the
+      // settings screen can render next to the save button.
+      regeneration,
     });
   } catch (err) {
     respondWithError(res, err, "PATCH /agencies/me/branding");
@@ -167,6 +177,19 @@ export async function getSiteBranding(req: Request, res: Response): Promise<void
 
     res.setHeader("Cache-Control", PUBLIC_SITE_CACHE);
     res.setHeader("ETag", etag);
+
+    /**
+     * Day 4: label the response so a CDN can purge it by tag.
+     *
+     * The ETag above only helps a client that *asks* whether its copy is still
+     * good; a CDN holding this body for its full 60 seconds asks nobody. This
+     * header is the other half — it lets `PATCH /agencies/me/branding` say
+     * "drop everything labelled `branding:xyz`" and have that mean something.
+     *
+     * Without it, every tag-based purge in the pipeline succeeds and clears
+     * nothing, which is the most expensive kind of bug: it looks like it works.
+     */
+    res.setHeader("Cache-Tag", cacheTagHeaderValue(slug, ["branding"]));
 
     if (req.headers["if-none-match"] === etag) {
       res.status(304).end();

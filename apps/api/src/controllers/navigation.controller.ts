@@ -21,6 +21,7 @@ import {
   updateNavigation,
 } from "../services/navigation.service";
 import type { NavigationUpdateInput } from "../validations/navigation.validation";
+import { cacheTagHeaderValue } from "../data/staticPages";
 
 /** Dashboard reads: always fresh. */
 const PRIVATE_NO_STORE = "private, no-store";
@@ -104,13 +105,15 @@ export async function patchMyNavigation(req: Request, res: Response): Promise<vo
     // hoping.
     const input = req.body as NavigationUpdateInput;
 
-    const navigation = await updateNavigation(agencyId, input);
+    // Day 4: receipt lifted out of `data`, as on Day 1's and Day 2's writes.
+    const { regeneration, ...navigation } = await updateNavigation(agencyId, input);
 
     res.setHeader("Cache-Control", PRIVATE_NO_STORE);
     res.status(200).json({
       success: true,
       message: "Navigation updated",
       data: navigation,
+      regeneration,
     });
   } catch (err) {
     respondWithError(res, err, "PATCH /agencies/me/navigation");
@@ -149,6 +152,8 @@ export async function getNavigationBySlug(req: Request, res: Response): Promise<
 
     res.setHeader("Cache-Control", PUBLIC_SITE_CACHE);
     res.setHeader("ETag", etag);
+    // Day 4: the purge label for this body. See `branding.controller.ts`.
+    res.setHeader("Cache-Tag", cacheTagHeaderValue(slug, ["navigation"]));
 
     if (req.headers["if-none-match"] === etag) {
       res.status(304).end();
