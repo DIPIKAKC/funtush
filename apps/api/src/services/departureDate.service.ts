@@ -16,7 +16,7 @@ import {
 // calling agency before touching its dates. We never trust a packageId or dateId
 // from the URL on its own.
 
-const notFound = (message: string) => {
+export const notFound = (message: string) => {
   const err = new Error(message) as Error & { status?: number };
   err.status = 404;
   return err;
@@ -45,7 +45,7 @@ const getOwnedDeparture = async (packageId: string, dateId: string) => {
 // Derive status from the slot counts. A date is FULL once every seat is taken.
 // We never silently downgrade a GUARANTEED date — that's a deliberate agency
 // promise — but we DO promote it to FULL when it sells out.
-const deriveStatus = (
+export const deriveStatus = (
   bookedSlots: number,
   maxSlots: number,
   current: DepartureStatus
@@ -187,6 +187,30 @@ export const confirmSlotsForBooking = async (
       bookedSlots,
       // booked_slots >= max_slots → FULL
       status: bookedSlots >= departure.maxSlots ? "FULL" : departure.status,
+    },
+  });
+};
+
+// Releases the seats reserved for a booking and recalculates the departure status.
+// Preserves GUARANTEED status because it represents an explicit agency commitment.
+export const releaseSlotsForBooking = async (
+  tx: Prisma.TransactionClient,
+  departureDateId: string,
+  groupSize: number
+) => {
+  const departure = await tx.trekDepartureDate.findUnique({
+    where: { id: departureDateId },
+  });
+  if (!departure) throw notFound("Departure date no longer exists");
+
+  const bookedSlots = Math.max(departure.bookedSlots - groupSize, 0);
+
+  return tx.trekDepartureDate.update({
+    where: { id: departureDateId },
+    data: {
+      bookedSlots,
+      // Preserves GUARANTEED status because it represents an explicit agency commitment.
+      status: deriveStatus(bookedSlots, departure.maxSlots, departure.status),
     },
   });
 };

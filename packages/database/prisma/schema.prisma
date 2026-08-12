@@ -31,7 +31,6 @@ enum RoleType {
 
 enum BookingStatus {
   INQUIRY
-  PENDING
   CONFIRMED
   PAYMENT_PENDING
   REJECTED

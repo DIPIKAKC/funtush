@@ -4,7 +4,7 @@ import { generateOTP } from "@funtush/auth";
 import { sendAlternativeDateEmail, sendBookingAcceptedEmail, sendBookingRejectedEmail, sendOtpEmail } from "../utils/email";
 import { sendInquiryConfirmationEmail, sendAgencyInquiryAlertEmail } from "../utils/email";
 import { notifyAgencyAdmins, notifyTrekker } from "./notification.service.js";
-import { confirmSlotsForBooking } from "./departureDate.service.js";
+import { confirmSlotsForBooking, releaseSlotsForBooking } from "./departureDate.service.js";
 import { recordConversion } from "./marketplaceAnalytics.service.js";
 import { validateAndApplyCoupon } from "./coupon.service";
 
@@ -350,7 +350,7 @@ export async function acceptBooking(bookingId: string, agencyId: string) {
     await confirmSlotsForBooking(tx, booking.departureDateId, booking.groupSize);
     await tx.booking.update({
       where: { id: bookingId },
-      data: { status: "CONFIRMED" },
+      data: { status: "PAYMENT_PENDING" },
     });
     await tx.paymentLink.create({
       data: {
@@ -374,13 +374,13 @@ export async function acceptBooking(bookingId: string, agencyId: string) {
 
   if (booking.trekkerId) {
     await notifyTrekker(booking.trekkerId, {
-      title: "Booking Confirmed!",
-      body: `Your booking for ${booking.package.title} has been confirmed. Please complete payment within 48 hours.`,
-      data: { bookingId, type: "BOOKING_CONFIRMED", link: `/bookings/${bookingId}` },
+      title: "Booking Accepted — Payment Required",
+      body: `Please complete payment for ${booking.package.title} within 48 hours to confirm your booking.`,
+      data: { bookingId, type: "PAYMENT_REQUIRED", link: `/bookings/${bookingId}` },
     });
   }
 
-  return { bookingId, status: "CONFIRMED", paymentUrl, expiresAt };
+  return { bookingId, status: "PAYMENT_PENDING", paymentUrl, expiresAt };
 }
 
 // PATCH /bookings/:id/reject
@@ -398,7 +398,7 @@ export async function rejectBooking(
 
   if (!booking) throw new Error("Booking not found");
   if (booking.agencyId !== agencyId) throw new Error("Unauthorized");
-  if (!["INQUIRY", "CONFIRMED"].includes(booking.status)) {
+  if (booking.status !== "INQUIRY") {
     throw new Error("Booking cannot be rejected in its current state");
   }
 
@@ -469,4 +469,167 @@ export async function proposeAlternativeDate(
   }
 
   return { bookingId, status: "ALTERNATIVE_PROPOSED", proposedDate: date };
+}
+
+// PATCH /bookings/:id/confirm — final agency sign-off after payment.
+export async function confirmBooking(bookingId: string, agencyId: string) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { package: true },
+  });
+
+  if (!booking) throw new Error("Booking not found");
+  if (booking.agencyId !== agencyId) throw new Error("Unauthorized");
+  if (booking.status !== "PAID") throw new Error("Booking is not in PAID state");
+
+  await prisma.booking.update({ where: { id: bookingId }, data: { status: "CONFIRMED" } });
+
+  if (booking.trekkerId) {
+    await notifyTrekker(booking.trekkerId, {
+      title: "Booking Confirmed!",
+      body: `Your booking for ${booking.package.title} is fully confirmed. See you on the trail!`,
+      data: { bookingId, type: "BOOKING_CONFIRMED", link: `/bookings/${bookingId}` },
+    });
+  }
+
+  return { bookingId, status: "CONFIRMED" };
+}
+
+// PATCH /bookings/:id/cancel — post-acceptance cancellation (slots reserved
+// and/or payment may already exist, unlike reject).
+export async function cancelBooking(bookingId: string, agencyId: string, reason: string) {
+  if (!reason?.trim()) throw new Error("Cancellation reason is required");
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { package: true, paymentLink: true },
+  });
+
+  if (!booking) throw new Error("Booking not found");
+  if (booking.agencyId !== agencyId) throw new Error("Unauthorized");
+
+  const cancellableFrom = ["PAYMENT_PENDING", "PAID", "CONFIRMED", "ACTIVE"];
+  if (!cancellableFrom.includes(booking.status)) {
+    throw new Error("Booking cannot be cancelled in its current state");
+  }
+
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await releaseSlotsForBooking(tx, booking.departureDateId, booking.groupSize);
+    await tx.booking.update({
+      where: { id: bookingId },
+      data: { status: "CANCELLED", rejectionReason: reason },
+    });
+  });
+
+
+  // TODO: if booking.paymentLink?.used, trigger refund via payment gateway — not implemented.
+
+  await sendBookingRejectedEmail(booking.trekkerEmail, booking.trekkerName, booking.package.title, reason);
+
+  if (booking.trekkerId) {
+    await notifyTrekker(booking.trekkerId, {
+      title: "Booking Cancelled",
+      body: `Your booking for ${booking.package.title} has been cancelled.${booking.paymentLink?.used ? " A refund will be processed." : ""
+        }`,
+      data: { bookingId, type: "BOOKING_CANCELLED", link: `/bookings/${bookingId}` },
+    });
+  }
+
+  return { bookingId, status: "CANCELLED" };
+}
+
+// GET /agencies/me/bookings/:id — single booking detail.
+export async function getBookingById(bookingId: string, agencyId: string) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      package: { select: { title: true, slug: true } },
+      departureDate: { select: { startDate: true } },
+      addOns: { include: { addOn: true } },
+      paymentLink: true,
+    },
+  });
+
+  if (!booking || booking.agencyId !== agencyId) {
+    throw new Error("Booking not found");
+  }
+
+  return booking;
+}
+
+// PATCH /bookings/:id/assign-guide — requires CONFIRMED status
+export async function assignGuide(bookingId: string, agencyId: string, guideRef: string) {
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+
+  if (!booking) throw new Error("Booking not found");
+  if (booking.agencyId !== agencyId) throw new Error("Unauthorized");
+  if (booking.status !== "CONFIRMED") throw new Error("Booking must be CONFIRMED to assign a guide");
+
+  // Validate the guide actually exists, belongs to this agency, and is active.
+  const guide = await prisma.guideProfile.findUnique({
+    where: { agencyId_guideRef: { agencyId, guideRef } },
+  });
+  if (!guide || !guide.isActive) throw new Error("Guide not found or inactive");
+
+  await prisma.booking.update({
+    where: { id: bookingId },
+    data: { assignedGuideId: guideRef },
+  });
+
+  return { bookingId, assignedGuideId: guideRef };
+}
+
+// PATCH /bookings/:id/check-in — CONFIRMED → ACTIVE 
+export async function checkInBooking(bookingId: string, agencyId: string) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { package: true },
+  });
+
+  if (!booking) throw new Error("Booking not found");
+  if (booking.agencyId !== agencyId) throw new Error("Unauthorized");
+  if (booking.status !== "CONFIRMED") throw new Error("Booking must be CONFIRMED to check in");
+  if (!booking.assignedGuideId) throw new Error("Assign a guide before checking in");
+
+  await prisma.booking.update({
+    where: { id: bookingId },
+    data: { status: "ACTIVE" },
+  });
+
+  if (booking.trekkerId) {
+    await notifyTrekker(booking.trekkerId, {
+      title: "Trek Started",
+      body: `Your trek for ${booking.package.title} has begun. Have a great trip!`,
+      data: { bookingId, type: "TREK_STARTED", link: `/bookings/${bookingId}` },
+    });
+  }
+
+  return { bookingId, status: "ACTIVE" };
+}
+
+// PATCH /bookings/:id/check-out — ACTIVE → COMPLETED
+export async function checkOutBooking(bookingId: string, agencyId: string) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { package: true },
+  });
+
+  if (!booking) throw new Error("Booking not found");
+  if (booking.agencyId !== agencyId) throw new Error("Unauthorized");
+  if (booking.status !== "ACTIVE") throw new Error("Booking must be ACTIVE to check out");
+
+  await prisma.booking.update({
+    where: { id: bookingId },
+    data: { status: "COMPLETED" },
+  });
+
+  if (booking.trekkerId) {
+    await notifyTrekker(booking.trekkerId, {
+      title: "Trek Completed",
+      body: `Your trek for ${booking.package.title} is complete. We'd love your feedback!`,
+      data: { bookingId, type: "TREK_COMPLETED", link: `/bookings/${bookingId}` },
+    });
+  }
+
+  return { bookingId, status: "COMPLETED" };
 }
