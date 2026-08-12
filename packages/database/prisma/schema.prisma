@@ -196,9 +196,8 @@ model Agency {
   journalEntries JournalEntry[]
 
   bugReports BugReport[]
-  apiKeys ApiKey[]
+  apiKeys    ApiKey[]
   navigation AgencyNavigation?
-
 
   stripeSubscription StripeSubscription?
 
@@ -210,6 +209,7 @@ model Agency {
   fonepayQRCode       FonepayQRCode?
   fonepayTransactions FonepayTransaction[]
   categories          Category[]
+  blogs               Blog[]
 
   @@map("agencies")
 }
@@ -659,11 +659,11 @@ model GuideProfile {
   satellitePhone String?  @map("satellite_phone")
   /// Languages the guide speaks, e.g. ["en", "ne", "de"].
   languages      String[] @default([])
-  isActive Boolean @default(true) @map("is_active")
+  isActive       Boolean  @default(true) @map("is_active")
 
   branchId String? @map("branch_id")
-  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1386,21 +1386,21 @@ enum BugPriority {
 }
 
 model BugReport {
-  id                String       @id @default(cuid())
-  agencyId          String
-  agency            Agency       @relation(fields: [agencyId], references: [id])
+  id       String @id @default(cuid())
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id])
 
-  title             String
-  description       String
-  stepsToReproduce  String?
-  screenshotUrl     String?
+  title            String
+  description      String
+  stepsToReproduce String?
+  screenshotUrl    String?
 
-  status            BugStatus    @default(REPORTED)
-  priority          BugPriority?
-  resolutionNote    String?
+  status         BugStatus    @default(REPORTED)
+  priority       BugPriority?
+  resolutionNote String?
 
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   assignedToId String?
   assignedTo   User?     @relation("BugAssignee", fields: [assignedToId], references: [id])
@@ -1428,16 +1428,16 @@ enum ApiKeyScope {
 }
 
 model ApiKey {
-  id          String      @id @default(cuid())
-  agencyId    String
-  agency      Agency      @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  name        String
-  keyHash     String      @unique
-  keyPrefix   String      
-  scope       ApiKeyScope @default(READ_ONLY)
-  lastUsedAt  DateTime?   @map("last_used_at")
-  revoked     Boolean     @default(false)
-  createdAt   DateTime    @default(now()) @map("created_at")
+  id         String      @id @default(cuid())
+  agencyId   String
+  agency     Agency      @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  name       String
+  keyHash    String      @unique
+  keyPrefix  String
+  scope      ApiKeyScope @default(READ_ONLY)
+  lastUsedAt DateTime?   @map("last_used_at")
+  revoked    Boolean     @default(false)
+  createdAt  DateTime    @default(now()) @map("created_at")
 
   @@index([agencyId])
   @@map("api_keys")
@@ -1731,7 +1731,8 @@ model AgencyNavigationItem {
   @@index([parentId])
   @@map("agency_navigation_items")
 }
-//Category
+
+//Category and Blog
 model Category {
   id          String  @id @default(uuid())
   agencyId    String  @map("agency_id")
@@ -1742,8 +1743,32 @@ model Category {
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  blogs     Blog[]
 
   @@unique([agencyId, name])
   @@index([agencyId])
   @@map("categories")
+}
+
+model Blog {
+  id         String  @id @default(uuid())
+  agencyId   String  @map("agency_id")
+  categoryId String? @map("category_id")
+
+  title    String
+  subtitle String
+  content  String
+  status   String?
+  tag      String?
+  photos   String[] @default([])
+
+  agency   Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([agencyId])
+  @@index([categoryId])
+  @@map("blogs")
 }
