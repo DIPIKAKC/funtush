@@ -324,6 +324,15 @@ describe("GET /site/:slug/config", () => {
     expect(maxAge).toBeLessThanOrEqual(15);
   });
 
+  it("labels the response so Day 4's purge can find it", async () => {
+    // 15 seconds is short, but this payload holds the switch that takes a
+    // website offline — "your launch is live in up to fifteen seconds" is not a
+    // sentence anyone wants to say. The tag is what makes it instant.
+    const res = await fetch(`${baseUrl}/site/himalayan-trails/config`);
+
+    expect(res.headers.get("cache-tag")).toBe("config:himalayan-trails");
+  });
+
   it("answers 304 to a matching If-None-Match", async () => {
     const first = await fetch(`${baseUrl}/site/himalayan-trails/config`);
     const etag = first.headers.get("etag")!;

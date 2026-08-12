@@ -17,6 +17,7 @@ import branchRoutes from "./routes/branches.routes.js";
 import brandingRoutes from "./routes/branding.routes.js";
 import siteConfigRoutes from "./routes/siteConfig.routes.js";
 import navigationRoutes from "./routes/navigation.routes.js";
+import regenerationRoutes from "./routes/regeneration.routes.js";
 import widgetsRoutes from "./routes/widgets/widgets.routes.js";
 import instagramRoutes from "./routes/widgets/instagram.routes.js";
 import blogRoutes from "./routes/blog.routes.js";
@@ -34,6 +35,7 @@ import { startVisibilityScoreCron } from "./jobs/visibilityScore.job.js";
 import { startSubscriptionCron } from "./jobs/subscriptionExpiry.job.js";
 import { startAdPerformanceSyncJob } from "./jobs/syncAdPerformance.job.js";
 import { configureIndexes } from "./services/search.service.js";
+import { flushRegenerations } from "./services/regeneration.service.js";
 import {
   initNotificationService,
   ensureNotificationIndexes,
@@ -59,6 +61,8 @@ app.use("/", brandingRoutes);
 app.use("/", siteConfigRoutes);
 // Navigation builder: custom menu (Medium/Large), Book Now button, fixed nav for Small.
 app.use("/", navigationRoutes);
+// Static site regeneration: publish history + the manual "Republish" button.
+app.use("/", regenerationRoutes);
 app.use("/agencies/me/widgets", widgetsRoutes);
 app.use("/", instagramRoutes);
 app.use("/", blogRoutes);
@@ -133,9 +137,32 @@ if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   // Ensure Meilisearch indexes + settings exist on boot (idempotent, non-blocking).
   configureIndexes().catch(console.error);
 
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log(`Funtush API listening on port ${port}`);
   });
+
+  /**
+   * Graceful shutdown (White-label week · Day 4).
+   *
+   * A regeneration pipeline runs *after* the HTTP response has been sent, so a
+   * deploy that kills the worker mid-pipeline can stop it between "the API cache
+   * was purged" and "the pages were rebuilt" — the one state in the whole design
+   * that actually serves something wrong. Draining first costs a second or two
+   * per deploy and removes that window entirely.
+   *
+   * `server.close` stops accepting new connections while letting in-flight
+   * requests finish, so the two drains are complementary: no new regenerations
+   * are queued, and the queued ones are allowed to land.
+   */
+  const shutdown = (signal: string) => {
+    console.log(`[shutdown] ${signal} received — draining regenerations`);
+    server.close(() => {
+      void flushRegenerations().finally(() => process.exit(0));
+    });
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 export { app };
