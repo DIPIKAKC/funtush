@@ -160,29 +160,3 @@ export const updateBlog = async (
     }
 };
 
-export const getAgencyBlogs = async (
-    req: Request,
-    res: Response
-) => {
-    try {
-        const agencyUserId = req.tenantId as string;
-
-        const blogs = await getBlogsService(
-            agencyUserId
-        );
-
-        return res.status(200).json({
-            success: true,
-            count: blogs.length,
-            data: blogs,
-        });
-    } catch (err) {
-        return res.status(400).json({
-            success: false,
-            message:
-                err instanceof Error
-                    ? err.message
-                    : "Something went wrong",
-        });
-    }
-};
