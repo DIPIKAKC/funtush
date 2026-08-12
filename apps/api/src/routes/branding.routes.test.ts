@@ -254,6 +254,24 @@ describe("GET /site/:slug/branding", () => {
     expect(res.headers.get("etag")).toBeTruthy();
   });
 
+  it("labels the response so Day 4's purge can find it", async () => {
+    const res = await fetch(`${baseUrl}/site/himalayan-trails/branding`);
+
+    // A CDN can only purge by a tag the response told it about. Without this
+    // header every tag-based purge succeeds and clears nothing — the most
+    // expensive kind of bug, because it looks like it works.
+    expect(res.headers.get("cache-tag")).toBe("branding:himalayan-trails");
+  });
+
+  it("scopes that label to one agency", async () => {
+    // A shared tag would mean one agency's save purges every site on the
+    // platform (Backend Guide §4).
+    getPublicBrandingBySlug.mockResolvedValue({ ...THEME, agencySlug: "annapurna-base" });
+    const res = await fetch(`${baseUrl}/site/annapurna-base/branding`);
+
+    expect(res.headers.get("cache-tag")).toBe("branding:annapurna-base");
+  });
+
   it("304s a repeat request carrying the same ETag", async () => {
     const first = await fetch(`${baseUrl}/site/himalayan-trails/branding`);
     const etag = first.headers.get("etag") as string;
