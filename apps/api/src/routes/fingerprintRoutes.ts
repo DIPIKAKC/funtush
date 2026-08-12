@@ -1,7 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { FingerprintService } from '../services/fingerprintService';
 import { FingerprintDatabaseService } from '../services/fingerprintDatabaseService';
-
 const fingerprintRoutes = Router();
 
 /**
