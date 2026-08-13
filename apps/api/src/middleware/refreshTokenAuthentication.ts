@@ -1,12 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { db } from "@funtush/database";
-
-interface RefreshTokenPayload {
-    userId: string;
-    iat?: number;
-    exp?: number;
-}
+import { jwtPayload } from "@funtush/auth";
 
 export const authenticateWithRefreshToken = async (
     req: Request,
@@ -23,13 +18,13 @@ export const authenticateWithRefreshToken = async (
         }
 
         // Verify JWT refresh token
-        let decoded: RefreshTokenPayload;
+        let decoded: jwtPayload;
 
         try {
             decoded = jwt.verify(
                 refreshToken,
                 process.env.JWT_REFRESH_SECRET as string
-            ) as RefreshTokenPayload;
+            ) as jwtPayload;
         } catch {
             return res.status(401).json({
                 message: "Invalid or expired refresh token",
@@ -73,8 +68,8 @@ export const authenticateWithRefreshToken = async (
 
         req.user = {
             userId: decoded.userId,
-            role: "STAFF",
-            roleType: "TENANT",
+            role: decoded.role,
+            roleType: decoded.roleType,
         };
 
         return next();
