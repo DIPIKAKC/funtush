@@ -104,7 +104,7 @@ export const createAgency = async (data: CreateAgencyInput) => {
       agencyId: agency.id,
       slug: agency.slug,
       rawRefreshToken: rawRefreshToken,
-      refreshToken: refreshToken,
+      // refreshToken: refreshToken,
     },
   };
 };
