@@ -153,7 +153,7 @@ interface CreateBlogPayload {
     categoryId: string;
     status: string;
     tag: string;
-    photos: string[];
+    photos?: string[];
 }
 
 interface UpdateBlogPayload {
@@ -198,7 +198,7 @@ export const createBlogService = async (
             categoryId: data.categoryId,
             status: data.status,
             tag: data.tag,
-            photos: data.photos,
+            photos: data?.photos,
         },
         include: {
             category: {
