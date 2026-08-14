@@ -1,0 +1,102 @@
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: funtush-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: funtush
+      POSTGRES_PASSWORD: funtush
+      POSTGRES_DB: funtush
+    ports:
+      - "5432:5432"
+    volumes:
+      - funtush_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U funtush -d funtush"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: funtush-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - funtush_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    container_name: funtush-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - funtush_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    container_name: funtush-meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "7700:7700"
+    volumes:
+      - funtush_meili_data:/meili_data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://127.0.0.1:7700/health || exit 1"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: funtush-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://funtush:funtush@postgres:5432/funtush?schema=public
+      REDIS_URL: redis://redis:6379
+      MONGO_URL: mongodb://mongo:27017/funtush
+      MEILI_HOST: http://meilisearch:7700
+      PORT: 4000
+      NODE_ENV: production
+    ports:
+      - "4000:4000"
+
+volumes:
+  funtush_postgres_data:
+  funtush_redis_data:
+  funtush_mongo_data:
+  funtush_meili_data:

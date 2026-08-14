@@ -5,6 +5,7 @@ interface CreateBranchPayload {
     address: string;
     phone: string;
     whatsapp?: string;
+    managerStaffId?: string;
     isHeadOffice?: boolean;
 }
 
@@ -74,6 +75,19 @@ export const createBranchService = async (
         );
     }
 
+    if (data.managerStaffId) {
+        const manager = await db.agencyStaff.findFirst({
+            where: {
+                id: data.managerStaffId,
+                agencyId: agency.id,
+                isActive: true
+            }
+        });
+
+        if (!manager)
+            throw new Error("Manager does not belong to your agency.");
+    }
+
     if (data.isHeadOffice === true) {
         const existing = await db.branch.findFirst({
             where: {
@@ -93,6 +107,7 @@ export const createBranchService = async (
             address: data.address,
             phone: data.phone,
             whatsapp: data.whatsapp,
+            managerStaffId: data.managerStaffId,
             isHeadOffice: data.isHeadOffice ?? false
         }
     });
@@ -296,8 +311,28 @@ export const assignGuideToBranchService = async (
         }
     });
 
-    if (!agencyUser)
+    if (!agencyUser) {
         throw new Error("Agency user not found");
+    }
+
+    if (!data.branchId) {
+        throw new Error("Please select a branch.");
+    }
+
+    const branch = await db.branch.findFirst({
+        where: {
+            id: data.branchId,
+            agencyId: agencyUser.agencyId
+        },
+        select: {
+            id: true,
+            name: true
+        }
+    });
+
+    if (!branch) {
+        throw new Error("Branch not found");
+    }
 
     const guide = await db.guideProfile.findFirst({
         where: {
@@ -306,30 +341,10 @@ export const assignGuideToBranchService = async (
         }
     });
 
-    if (!guide)
+    if (!guide) {
         throw new Error("Guide not found");
-
-    if (!data.branchId) {
-        throw new Error("Please select a branch.");
     }
 
-    // Validate branch belongs to same agency
-    const branch = await db.branch.findFirst({
-        where: {
-            id: data.branchId,
-            agencyId: agencyUser.agencyId,
-        },
-        select: {
-            id: true,
-            name: true,
-        },
-    });
-
-    if (!branch) {
-        throw new Error("Invalid branch");
-    }
-
-    // Already assigned?
     if (guide.branchId === data.branchId) {
         throw new Error("Guide is already assigned to this branch");
     }
@@ -356,14 +371,13 @@ export const assignGuideToBranchService = async (
             id: branch.id
         },
         select: {
-            guides: true,
+            guides: true
         }
-    }
-    );
+    });
 
     return {
-        updatedGuide: updatedGuide,
-        updatedBranch: updatedBranch
+        updatedGuide,
+        updatedBranch
     };
 }
 

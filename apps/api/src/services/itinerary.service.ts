@@ -2,7 +2,7 @@ import { db } from "@funtush/database";
 import {
   validateItineraryDayInput,
   validateItineraryUpdateInput,
-} from "../utils/validator";
+} from "../test/utils/validator";
 
 // Day 3 — Itinerary Builder.
 //

@@ -1,0 +1,84 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm production deployment'
+        required: true
+        default: ''
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Validate confirmation input
+        if: ${{ github.event.inputs.confirm != 'deploy' }}
+        run: |
+          echo "::error::You must type 'deploy' to confirm. Aborting."
+          exit 1
+
+      - name: Set up SSH key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy application
+        env:
+          SSH_HOST: ${{ secrets.SERVER_HOST }}
+          SSH_USER: ${{ secrets.SERVER_USER }}
+          APP_DIR: /home/rituraj/app/funtush
+        run: |
+          set -euo pipefail
+
+          ssh -i ~/.ssh/id_rsa \
+              -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=yes \
+              "$SSH_USER@$SSH_HOST" bash -s <<EOF
+            set -euo pipefail
+
+            echo "================================"
+            echo "Connected as: \$(whoami)"
+            echo "Host: \$(hostname)"
+            echo "================================"
+
+            cd "$APP_DIR"
+
+            echo "Pulling latest changes..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "Building containers..."
+            docker compose build
+
+            echo "Starting services..."
+            docker compose up -d
+
+            echo "Cleaning up dangling images..."
+            docker image prune -f
+
+            echo "================================"
+            echo "Deployment finished successfully"
+            echo "================================"
+          EOF
+
+      - name: Verify deployment health
+        env:
+          SSH_HOST: ${{ secrets.SERVER_HOST }}
+          SSH_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_rsa \
+              -o ConnectTimeout=10 \
+              "$SSH_USER@$SSH_HOST" \
+              "docker compose -f /home/rituraj/app/funtush/docker-compose.yml ps"
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_rsa

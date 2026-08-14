@@ -1,0 +1,12 @@
+**/node_modules
+**/.turbo
+**/dist
+**/coverage
+.git
+.env
+**/.env
+!**/.env.example
+Dockerfile
+docker-compose.yml
+.dockerignore
+*.md

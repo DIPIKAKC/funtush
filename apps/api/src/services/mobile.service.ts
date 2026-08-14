@@ -1,6 +1,6 @@
 import { db } from "@funtush/database";
 import type { BookingStatus } from "@funtush/database";
-import { buildMeta, type PageRequest, type PageMeta } from "../utils/pagination";
+import { buildMeta, type PageRequest, type PageMeta } from "../test/utils/pagination";
 
 /**
  * ── Mobile-optimized API layer (Mobile week · Day 1) ─────────────────────────

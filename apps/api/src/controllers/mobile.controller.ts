@@ -5,7 +5,7 @@ import {
   parseSection,
   TREK_SECTIONS,
 } from "../services/mobile.service";
-import { parsePagination } from "../utils/pagination";
+import { parsePagination } from "../test/utils/pagination";
 
 /**
  * ── Mobile dashboard controllers (Mobile week · Day 1) ───────────────────────
