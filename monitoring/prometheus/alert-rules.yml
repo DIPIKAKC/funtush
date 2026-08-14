@@ -1,0 +1,7 @@
+﻿groups:
+  - name: funtush_alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_error_total[5m]) > 0.05
+      - alert: SOSUnacknowledged
+        expr: sos_unacknowledged_total > 5
