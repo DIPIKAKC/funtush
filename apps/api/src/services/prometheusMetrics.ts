@@ -174,7 +174,8 @@ const metricsMiddleware = (req: Request, res: Response, next: NextFunction) => {
 
   // Track response
   const originalSend = res.send;
-  res.send = function (data: any) {
+
+  res.send = function (data: string | Buffer) {
     const duration = (Date.now() - start) / 1000;
     const statusCode = res.statusCode || 500;
 
