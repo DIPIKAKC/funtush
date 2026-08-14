@@ -1,8 +1,8 @@
 import { randomBytes } from "crypto";
 import { prisma, redis, type Prisma } from "@funtush/database";
 import { generateOTP } from "@funtush/auth";
-import { sendAlternativeDateEmail, sendBookingAcceptedEmail, sendBookingRejectedEmail, sendOtpEmail } from "../utils/email";
-import { sendInquiryConfirmationEmail, sendAgencyInquiryAlertEmail } from "../utils/email";
+import { sendAlternativeDateEmail, sendBookingAcceptedEmail, sendBookingRejectedEmail, sendOtpEmail } from "../test/utils/email";
+import { sendInquiryConfirmationEmail, sendAgencyInquiryAlertEmail } from "../test/utils/email";
 import { notifyAgencyAdmins, notifyTrekker } from "./notification.service.js";
 import { confirmSlotsForBooking, releaseSlotsForBooking } from "./departureDate.service.js";
 import { recordConversion } from "./marketplaceAnalytics.service.js";

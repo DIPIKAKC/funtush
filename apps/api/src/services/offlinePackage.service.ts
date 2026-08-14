@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import { db } from "@funtush/database";
 import type { BookingStatus, Prisma } from "@funtush/database";
 import { resolveGuideIdentity, toDateOnly, startOfUtcDay, trekEndDate, toNumber } from "./mobile.service";
-import { httpError } from "../utils/httpError";
-import { stableStringify } from "../utils/stableStringify";
+import { httpError } from "../test/utils/httpError";
+import { stableStringify } from "../test/utils/stableStringify";
 
 /**
  * ── Offline itinerary caching contract (Mobile week · Day 2) ─────────────────
@@ -77,7 +77,7 @@ export const AGENCY_WIDE_ROLES: readonly string[] = ["AGENCY_ADMIN", "AGENCY_MOD
  * existing `import { httpError } from "./offlinePackage.service"` working.
  */
 export { httpError };
-export type { HttpError } from "../utils/httpError";
+export type { HttpError } from "../test/utils/httpError";
 
 /* ── Actor ───────────────────────────────────────────────────────────────── */
 

@@ -1,5 +1,5 @@
 import { db } from "@funtush/database";
-import { httpError } from "../utils/httpError";
+import { httpError } from "../test/utils/httpError";
 
 /**
  * ── Push token & device management (Mobile week · Day 3) ─────────────────────

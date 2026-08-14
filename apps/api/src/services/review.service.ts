@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { db } from "@funtush/database";
-import { sendReviewInvitationEmail } from "src/utils/email";
+import { sendReviewInvitationEmail } from "src/test/utils/email";
 
 export const sendReviewInvitations = async () => {
 
