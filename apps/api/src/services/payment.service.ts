@@ -1,6 +1,6 @@
 import { prisma, type Prisma, BookingStatus } from "@funtush/database";
 import { generateBookingConfirmationPDF } from "../lib/generatePDF";
-import { sendBookingConfirmationEmail, sendGuideAssignmentEmail } from "../utils/email";
+import { sendBookingConfirmationEmail, sendGuideAssignmentEmail } from "../test/utils/email";
 import { notifyAgencyAdmins, notifyTrekker } from "./notification.service";
 import { releaseSlotsForBooking } from "./departureDate.service";
 

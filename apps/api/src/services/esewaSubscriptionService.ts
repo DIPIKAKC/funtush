@@ -1,5 +1,5 @@
 import { db } from '@funtush/database';
-import { generateEsewaPayload, verifyEsewaPayment } from '../utils/esewa';
+import { generateEsewaPayload, verifyEsewaPayment } from '../test/utils/esewa';
 import { notificationService } from './notificationService';
 
 export async function initiateEsewaPayment(

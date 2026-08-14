@@ -1,5 +1,5 @@
 import { db } from '@funtush/database';
-import { getStripeClient } from '../utils/stripe';
+import { getStripeClient } from '../test/utils/stripe';
 
 import { notificationService } from './notificationService';
 
