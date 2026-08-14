@@ -26,8 +26,8 @@
 
 import { db } from "@funtush/database";
 import { uploadFile, deleteFile } from "@funtush/storage";
-import { httpError } from "../test/utils/httpError";
-import { readImageDimensions } from "../test/utils/imageDimensions";
+import { httpError } from "../utils/httpError";
+import { readImageDimensions } from "../utils/imageDimensions";
 import {
   BRAND_CURRENCIES,
   BRAND_FONTS,

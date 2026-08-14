@@ -1,5 +1,5 @@
 import { db } from '@funtush/database';
-import { initiateConnectIPSTransfer, checkConnectIPSStatus } from '../test/utils/connectIPS';
+import { initiateConnectIPSTransfer, checkConnectIPSStatus } from '../utils/connectIPS';
 import { notificationService } from './notificationService';
 
 export async function initiateConnectIPSPayment(

@@ -21,7 +21,7 @@
  */
 
 import { db } from "@funtush/database";
-import { httpError } from "../test/utils/httpError";
+import { httpError } from "../utils/httpError";
 import {
   DEFAULT_BOOK_NOW_LABEL,
   DEFAULT_NAVIGATION_ITEMS,

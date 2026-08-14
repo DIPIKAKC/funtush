@@ -1,6 +1,6 @@
 import { Router, raw } from 'express';
 import Stripe from 'stripe';
-import { getStripeWebhookSecret } from '../../test/utils/stripe';
+import { getStripeWebhookSecret } from '../../utils/stripe';
 import {
   handleInvoicePaid,
   handlePaymentFailed,
