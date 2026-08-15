@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticateWithRefreshToken } from 'src/middleware/refreshTokenAuthentication';
 import { checkAgencyStatus } from 'src/middleware/agencyAccess.middleware';
 import { db } from '@funtush/database';
-import { encryptCredentials } from '../test/utils/encryption';
+import { encryptCredentials } from '../utils/encryption';
 import type { AgencyRequest } from '../types/auth-request';
 
 const router = Router();

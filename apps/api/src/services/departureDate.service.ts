@@ -2,7 +2,7 @@ import { db, type DepartureStatus, type Prisma } from "@funtush/database";
 import {
   validateDepartureDateInput,
   validateDepartureUpdateInput,
-} from "../test/utils/validator";
+} from "../utils/validator";
 
 // Day 4 — Departure Dates & slot management.
 //

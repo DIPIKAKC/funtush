@@ -7,8 +7,8 @@ import {
   DEFAULT_EMERGENCY_COUNTRY,
   type CountryEmergencyNumbers,
 } from "../data/emergencyNumbers";
-import { stableStringify } from "../test/utils/stableStringify";
-import { httpError } from "../test/utils/httpError";
+import { stableStringify } from "../utils/stableStringify";
+import { httpError } from "../utils/httpError";
 
 /**
  * ── Local emergency number bundle (Mobile week · Day 4) ──────────────────────

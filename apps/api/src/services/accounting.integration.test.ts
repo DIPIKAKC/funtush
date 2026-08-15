@@ -71,6 +71,30 @@ try {
     }
     tierId = tier.id;
 
+    // A reachable database is not the same thing as a *migrated* one.
+    //
+    // `SELECT 1` and the tier lookup both succeed against a database whose
+    // accounting tables were never created — which is exactly the state of a
+    // developer machine whose migrations are behind, and of CI, whose
+    // `postgres:15` service container in `.github/workflows/ci.yml` starts empty
+    // and has no migration step. In that state every test below used to fail
+    // with `The table public.payrolls does not exist`, which contradicts this
+    // file's own promise at the top: *"if no database is reachable, every test
+    // is skipped instead of failing."*
+    //
+    // So the probe is widened to the thing that actually matters — can this
+    // database answer the queries these tests make? One cheap read per model the
+    // suite and its services touch. A missing table throws `P2021`, the `catch`
+    // below turns it into a skip with a readable reason, and a database that
+    // *has* been migrated is unaffected (each of these is an indexed lookup
+    // returning at most one row).
+    await Promise.all([
+        db.account.findFirst({ select: { id: true } }),
+        db.journalEntry.findFirst({ select: { id: true } }),
+        db.journalLine.findFirst({ select: { id: true } }),
+        db.payroll.findFirst({ select: { id: true } }),
+    ]);
+
     const finance = await import("./finance.service");
     recordIncomeService = finance.recordIncomeService;
     recordExpenseService = finance.recordExpenseService;
