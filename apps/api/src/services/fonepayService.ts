@@ -1,5 +1,5 @@
 import { db } from '@funtush/database';
-import { generateDynamicQRCode, verifyFonepayTransaction } from '../test/utils/fonepay';
+import { generateDynamicQRCode, verifyFonepayTransaction } from '../utils/fonepay';
 import { notificationService } from './notificationService';
 
 export async function activateFonepay(agencyId: string) {

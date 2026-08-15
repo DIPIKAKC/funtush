@@ -1,6 +1,6 @@
 import { prisma, AuditLog } from "@funtush/database";
 import { hashPassword } from "@funtush/auth";
-import { sendStaffInviteEmail } from "../test/utils/email";
+import { sendStaffInviteEmail } from "../utils/email";
 
 function generateTempPassword(): string {
   return Math.random().toString(36).slice(-8) + "A1!";

@@ -1,5 +1,5 @@
 import { db } from '@funtush/database';
-import { generateKhaltiPayload, verifyKhaltiPayment } from '../test/utils/khalti';
+import { generateKhaltiPayload, verifyKhaltiPayment } from '../utils/khalti';
 import { notificationService } from './notificationService';
 
 export async function initiateKhaltiPayment(

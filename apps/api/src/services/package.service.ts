@@ -1,5 +1,5 @@
 import { db } from "@funtush/database";
-import { validatePackageInput } from "../test/utils/validator";
+import { validatePackageInput } from "../utils/validator";
 import { indexPackage, indexAgency, removePackage } from "./search.service.js";
 
 // TrekPackage.slug is @unique and required — derive it from the title and

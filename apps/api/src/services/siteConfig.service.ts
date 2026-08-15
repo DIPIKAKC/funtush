@@ -29,7 +29,7 @@
  */
 
 import { db } from "@funtush/database";
-import { httpError } from "../test/utils/httpError";
+import { httpError } from "../utils/httpError";
 import { allowsFreeColorPicker, findSwatchByHex } from "../data/brandTheme";
 import {
   DEFAULT_CONSTRUCTION_COPY,
